@@ -1,0 +1,43 @@
+Screen {
+    background: $surface;
+}
+
+NavBar {
+    height: 1;
+    background: $primary-background;
+    color: $text;
+    padding: 0 1;
+}
+
+#filters {
+    height: 3;
+    padding: 0 1;
+}
+
+#search-input {
+    width: 1fr;
+}
+
+#txn-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#sync-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+HelpScreen {
+    align: center middle;
+}
+
+#help-box {
+    width: 50;
+    height: auto;
+    padding: 1 2;
+    border: round $accent;
+    background: $surface;
+}

@@ -1,0 +1,1 @@
+"""SimpLedge TUI package."""
