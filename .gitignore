@@ -5,3 +5,10 @@ dist/
 .venv/
 *.db
 .worktrees/
+
+# Sensitive data — NEVER commit
+*.toml.bak
+simplefin-raw*.json
+*-export.md
+*-export.csv
+*-export.json

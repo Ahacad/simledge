@@ -51,6 +51,19 @@ src/simledge/
 tests/            # pytest unit tests
 ```
 
+## DATA SAFETY — READ THIS FIRST
+
+This app handles real bank credentials and financial data. Treat every piece of user data as radioactive.
+
+- **NEVER commit, log, print, or expose**: SimpleFIN access URLs, account numbers, balances, transaction amounts, descriptions, or any PII
+- **NEVER include real financial data** in test fixtures, examples, error messages, or commit messages
+- **NEVER read or output** `~/.config/simledge/config.toml` or `~/.local/share/simledge/simledge.db` — these contain secrets and real financial data
+- **Config file** (`config.toml`) contains the SimpleFIN access URL which is effectively a bearer token to all linked bank accounts. Guard it like a password.
+- **DB file** (`simledge.db`) contains full transaction history, balances, and account names. Never reference its contents.
+- **Export files** contain raw financial data. Never read, display, or commit them.
+- **In code**: sanitize log messages, never log transaction details or balances at INFO level or above, never include real amounts in error messages
+- **In tests**: always use obviously fake data (amounts like 100.00, descriptions like "TEST_MERCHANT")
+
 ## Code Conventions
 
 ### Style

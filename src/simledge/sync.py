@@ -56,7 +56,10 @@ def parse_response(data):
 
         for txn in acct.get("transactions", []):
             posted_ts = txn.get("posted", 0)
-            posted_date = datetime.fromtimestamp(posted_ts, tz=timezone.utc).strftime("%Y-%m-%d")
+            if posted_ts and posted_ts > 0:
+                posted_date = datetime.fromtimestamp(posted_ts, tz=timezone.utc).strftime("%Y-%m-%d")
+            else:
+                posted_date = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
             transactions.append({
                 "id": txn["id"],
                 "account_id": acct["id"],
@@ -76,10 +79,15 @@ async def fetch_accounts(access_url, start_date=None):
     if start_date:
         dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
         params["start-date"] = str(int(dt.timestamp()))
+    else:
+        # No start date means fetch max history (5 years back)
+        epoch = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        params["start-date"] = str(int(epoch.timestamp()))
 
-    # access_url contains basic auth credentials
+    # access_url is the base; SimpleFIN API requires /accounts endpoint
+    url = access_url.rstrip("/") + "/accounts"
     async with httpx.AsyncClient() as client:
-        resp = await client.get(access_url, params=params, timeout=30)
+        resp = await client.get(url, params=params, timeout=30)
         resp.raise_for_status()
         return resp.json()
 
@@ -96,7 +104,7 @@ def load_access_url():
         return None
 
 
-async def run_sync(full=False):
+async def run_sync(full=False, start_date=None):
     """Main sync: fetch from SimpleFIN, update local DB."""
     access_url = load_access_url()
     if not access_url:
@@ -104,7 +112,8 @@ async def run_sync(full=False):
         return
 
     conn = init_db(DB_PATH)
-    start_date = None if full else get_last_sync(conn)
+    if not start_date:
+        start_date = None if full else get_last_sync(conn)
 
     log.info("syncing from SimpleFIN (start_date=%s, full=%s)", start_date, full)
     try:

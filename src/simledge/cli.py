@@ -16,6 +16,8 @@ def main():
 
     sync_p = sub.add_parser("sync", help="fetch data from SimpleFIN")
     sync_p.add_argument("--full", action="store_true", help="re-sync all history")
+    sync_p.add_argument("--start", help="start date YYYY-MM-DD (fetch history from this date)")
+    sync_p.add_argument("--raw", action="store_true", help="dump raw SimpleFIN JSON and exit")
 
     sub.add_parser("status", help="show last sync and DB stats")
     sub.add_parser("setup", help="configure SimpleFIN access")
@@ -57,8 +59,18 @@ def _run_tui():
 
 
 def _run_sync(args):
+    if args.raw:
+        from simledge.sync import load_access_url, fetch_accounts
+        import json
+        access_url = load_access_url()
+        if not access_url:
+            print("No SimpleFIN access URL configured. Run: simledge setup")
+            return
+        data = asyncio.run(fetch_accounts(access_url, start_date=args.start))
+        print(json.dumps(data, indent=2))
+        return
     from simledge.sync import run_sync
-    asyncio.run(run_sync(full=args.full))
+    asyncio.run(run_sync(full=args.full, start_date=args.start))
 
 
 def _run_status():
@@ -97,7 +109,8 @@ def _run_setup():
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         f.write(f'[simplefin]\naccess_url = "{access_url}"\n\n[sync]\nauto_pending = true\n\n[export]\ndefault_format = "markdown"\n')
-    print(f"\nConfig saved to {CONFIG_PATH}")
+    os.chmod(CONFIG_PATH, 0o600)
+    print(f"\nConfig saved to {CONFIG_PATH} (permissions: 600)")
     print("Run 'simledge sync' to fetch your data.")
 
 
