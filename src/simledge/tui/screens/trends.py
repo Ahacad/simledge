@@ -10,6 +10,7 @@ from textual.widgets import Footer, Header, Static
 from simledge.analysis import spending_trend, spending_by_category
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.widgets.navbar import NavBar
 
 try:
     import plotext as plt
@@ -34,6 +35,7 @@ def _render_chart(months, values):
 class TrendsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
+        yield NavBar("trends")
         with VerticalScroll():
             yield Static("", id="trends-content")
         yield Footer()

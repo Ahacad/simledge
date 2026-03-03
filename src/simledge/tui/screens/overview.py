@@ -10,11 +10,13 @@ from textual.widgets import DataTable, Footer, Header, Label, Static
 from simledge.analysis import monthly_summary, spending_by_category, recent_transactions
 from simledge.config import DB_PATH
 from simledge.db import init_db, get_last_sync
+from simledge.tui.widgets.navbar import NavBar
 
 
 class OverviewScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
+        yield NavBar("overview")
         with VerticalScroll():
             yield Label("", id="month-header")
             yield Label("", id="summary-line")

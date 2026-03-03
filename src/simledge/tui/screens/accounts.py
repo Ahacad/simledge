@@ -8,11 +8,13 @@ from textual.widgets import Footer, Header, Static
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.widgets.navbar import NavBar
 
 
 class AccountsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
+        yield NavBar("accounts")
         with VerticalScroll():
             yield Static("", id="accounts-content")
         yield Footer()

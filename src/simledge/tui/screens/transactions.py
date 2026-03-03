@@ -7,23 +7,32 @@ from textual.widgets import DataTable, Footer, Header, Input, Label
 
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.widgets.navbar import NavBar
 
 
 class TransactionsScreen(Screen):
     BINDINGS = [
-        ("slash", "focus_search", "Search"),
+        ("slash", "focus_search", "/ Search"),
+        ("escape", "blur_search", "Esc Back"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield NavBar("transactions")
         with Horizontal(id="filters"):
-            yield Input(placeholder="Search transactions...", id="search-input")
+            yield Input(placeholder="Press / to search...", id="search-input")
         yield DataTable(id="txn-table")
         yield Label("", id="txn-status")
         yield Footer()
 
     def on_mount(self):
         self._load_transactions()
+        # Focus table, NOT the search input
+        self.query_one("#txn-table", DataTable).focus()
+
+    def on_screen_resume(self):
+        # Also focus table when switching back to this screen
+        self.query_one("#txn-table", DataTable).focus()
 
     def _load_transactions(self, search=None):
         conn = init_db(DB_PATH)
@@ -72,3 +81,9 @@ class TransactionsScreen(Screen):
 
     def action_focus_search(self):
         self.query_one("#search-input", Input).focus()
+
+    def action_blur_search(self):
+        search_input = self.query_one("#search-input", Input)
+        search_input.value = ""
+        self.query_one("#txn-table", DataTable).focus()
+        self._load_transactions()

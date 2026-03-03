@@ -8,6 +8,7 @@ from textual.widgets import Footer, Header, Static
 from simledge.analysis import net_worth_history
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.widgets.navbar import NavBar
 
 try:
     import plotext as plt
@@ -19,6 +20,7 @@ except ImportError:
 class NetWorthScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
+        yield NavBar("networth")
         with VerticalScroll():
             yield Static("", id="networth-content")
         yield Footer()

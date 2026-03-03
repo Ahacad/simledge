@@ -2,6 +2,30 @@ Screen {
     background: $surface;
 }
 
-Placeholder {
-    height: 1fr;
+NavBar {
+    height: 1;
+    background: $primary-background;
+    color: $text;
+    padding: 0 1;
+}
+
+#filters {
+    height: 3;
+    padding: 0 1;
+}
+
+#search-input {
+    width: 1fr;
+}
+
+#txn-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#sync-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
 }
