@@ -1,9 +1,7 @@
 """Main Textual application for SimpLedge."""
 
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.binding import Binding
-from textual.screen import Screen
-from textual.widgets import Footer, Header, Placeholder
 
 from simledge.tui.screens.overview import OverviewScreen
 from simledge.tui.screens.transactions import TransactionsScreen
