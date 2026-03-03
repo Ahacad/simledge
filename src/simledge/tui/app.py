@@ -8,13 +8,7 @@ from textual.widgets import Footer, Header, Placeholder
 from simledge.tui.screens.overview import OverviewScreen
 from simledge.tui.screens.transactions import TransactionsScreen
 from simledge.tui.screens.accounts import AccountsScreen
-
-
-class TrendsScreen(Screen):
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Placeholder("Trends — coming soon")
-        yield Footer()
+from simledge.tui.screens.trends import TrendsScreen
 
 
 class NetWorthScreen(Screen):
