@@ -1,0 +1,1 @@
+"""SimpLedge — personal finance TUI."""
