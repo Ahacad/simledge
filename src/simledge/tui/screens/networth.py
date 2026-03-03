@@ -1,5 +1,6 @@
 """Net Worth screen — net worth over time with chart."""
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
@@ -22,6 +23,7 @@ class NetWorthScreen(Screen):
         yield Header()
         yield NavBar("networth")
         with VerticalScroll():
+            yield Static("", id="networth-chart")
             yield Static("", id="networth-content")
         yield Footer()
 
@@ -30,27 +32,32 @@ class NetWorthScreen(Screen):
         history = net_worth_history(conn, months=12)
         conn.close()
 
-        lines = ["\n"]
+        chart_widget = self.query_one("#networth-chart", Static)
+        text_widget = self.query_one("#networth-content", Static)
 
         if not history:
-            lines.append("  No balance data yet. Run: simledge sync")
-            self.query_one("#networth-content", Static).update("\n".join(lines))
+            chart_widget.update("")
+            text_widget.update("\n  No balance data yet. Run: simledge sync")
             return
 
-        months = [h["month"][5:] for h in history]
+        month_labels = [h["month"][5:] for h in history]
         values = [h["net_worth"] for h in history]
 
-        # Chart
+        # Chart — convert ANSI to Rich Text so Textual can render it
         if HAS_PLOTEXT and len(history) > 1:
             plt.clear_figure()
-            plt.plot(months, values, marker="braille")
+            x = list(range(len(month_labels)))
+            plt.plot(x, values, marker="braille")
+            plt.xticks(x, month_labels)
             plt.title("Net Worth Over Time")
             plt.theme("dark")
             plt.plotsize(60, 15)
-            lines.append(plt.build())
-            lines.append("")
+            chart_widget.update(Text.from_ansi(plt.build()))
+        else:
+            chart_widget.update("")
 
         # Current + change
+        lines = []
         current = values[-1] if values else 0
         lines.append(f"  Current Net Worth: ${current:,.2f}")
 
@@ -64,4 +71,4 @@ class NetWorthScreen(Screen):
                 f"  30-day Change: {color}{arrow} ${abs(change):,.2f} ({pct:+.1f}%)[/]"
             )
 
-        self.query_one("#networth-content", Static).update("\n".join(lines))
+        text_widget.update("\n".join(lines))

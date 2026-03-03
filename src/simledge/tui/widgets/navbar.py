@@ -36,4 +36,4 @@ class NavBar(Static):
             else:
                 parts.append(f"[dim] {key} {label} [/]")
 
-        return "  ".join(parts) + "  [dim]q Quit[/]"
+        return "  ".join(parts) + "  [dim]? Help  q Quit[/]"

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
@@ -19,24 +20,12 @@ except ImportError:
     HAS_PLOTEXT = False
 
 
-def _render_chart(months, values):
-    """Render a bar chart as a string using plotext."""
-    if not HAS_PLOTEXT or not months:
-        return "  No data or plotext not installed."
-
-    plt.clear_figure()
-    plt.bar(months, [abs(v) for v in values])
-    plt.title("Monthly Spending")
-    plt.theme("dark")
-    plt.plotsize(60, 15)
-    return plt.build()
-
-
 class TrendsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield NavBar("trends")
         with VerticalScroll():
+            yield Static("", id="trends-chart")
             yield Static("", id="trends-content")
         yield Footer()
 
@@ -57,17 +46,26 @@ class TrendsScreen(Screen):
         prev_cats = spending_by_category(conn, prev_month)
         conn.close()
 
-        lines = ["\n"]
+        chart_widget = self.query_one("#trends-chart", Static)
+        text_widget = self.query_one("#trends-content", Static)
 
-        # Chart
-        if trend:
-            months = [t["month"][5:] for t in trend]  # MM only
+        # Chart — convert ANSI to Rich Text so Textual can render it
+        if trend and HAS_PLOTEXT:
+            month_labels = [t["month"][5:] for t in trend]
             values = [t["total"] for t in trend]
-            chart = _render_chart(months, values)
-            lines.append(chart)
-            lines.append("")
+            plt.clear_figure()
+            x = list(range(len(month_labels)))
+            plt.bar(x, [abs(v) for v in values])
+            plt.xticks(x, month_labels)
+            plt.title("Monthly Spending")
+            plt.theme("dark")
+            plt.plotsize(60, 15)
+            chart_widget.update(Text.from_ansi(plt.build()))
+        else:
+            chart_widget.update("")
 
         # Category comparison
+        lines = []
         if current_cats or prev_cats:
             prev_dict = {c["category"]: c["total"] for c in prev_cats}
             lines.append(f"  Category Comparison ({prev_month[5:]} \u2192 {current_month[5:]})")
@@ -90,4 +88,4 @@ class TrendsScreen(Screen):
         if not trend and not current_cats:
             lines.append("  No data yet. Run: simledge sync")
 
-        self.query_one("#trends-content", Static).update("\n".join(lines))
+        text_widget.update("\n".join(lines))
