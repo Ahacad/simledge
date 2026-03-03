@@ -69,7 +69,8 @@ class TrendsScreen(Screen):
         if current_cats or prev_cats:
             prev_dict = {c["category"]: c["total"] for c in prev_cats}
             lines.append(f"  Category Comparison ({prev_month[5:]} \u2192 {current_month[5:]})")
-            lines.append(f"  {'\u2500' * 50}")
+            separator = "\u2500" * 50
+            lines.append(f"  {separator}")
             for c in current_cats:
                 cat = c["category"]
                 cur = c["total"]
@@ -81,7 +82,8 @@ class TrendsScreen(Screen):
                         f"  {cat:<18} ${abs(prev):>9,.2f} \u2192 ${abs(cur):>9,.2f}  {arrow} {abs(change):.0f}%"
                     )
                 else:
-                    lines.append(f"  {cat:<18} {'\u2014':>11} \u2192 ${abs(cur):>9,.2f}  new")
+                    dash = "\u2014"
+                    lines.append(f"  {cat:<18} {dash:>11} \u2192 ${abs(cur):>9,.2f}  new")
 
         if not trend and not current_cats:
             lines.append("  No data yet. Run: simledge sync")

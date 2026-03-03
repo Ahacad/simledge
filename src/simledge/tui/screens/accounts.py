@@ -44,14 +44,16 @@ class AccountsScreen(Screen):
         lines = ["\n"]
         for inst, accts in groups.items():
             lines.append(f"  {inst}")
-            lines.append(f"  {'\u2500' * len(inst)}")
+            underline = "\u2500" * len(inst)
+            lines.append(f"  {underline}")
             for a in accts:
                 bal = a["balance"] or 0
                 color = "[green]" if bal >= 0 else "[red]"
                 lines.append(f"    {a['name']:<30} {color}${bal:>12,.2f}[/]")
             lines.append("")
 
-        lines.append(f"  {'\u2501' * 50}")
+        separator = "\u2501" * 50
+        lines.append(f"  {separator}")
         lines.append(f"  Total Assets:  [green]${total_assets:>12,.2f}[/]")
         lines.append(f"  Total Debt:    [red]${total_debt:>12,.2f}[/]")
         lines.append(f"  Net Worth:     ${total_assets + total_debt:>12,.2f}")
