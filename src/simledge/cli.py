@@ -52,8 +52,8 @@ def main():
 
 
 def _run_tui():
-    print("TUI not implemented yet. Coming in Task 9+.")
-    sys.exit(0)
+    from simledge.tui.app import run_app
+    run_app()
 
 
 def _run_sync(args):

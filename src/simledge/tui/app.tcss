@@ -1,0 +1,7 @@
+Screen {
+    background: $surface;
+}
+
+Placeholder {
+    height: 1fr;
+}
