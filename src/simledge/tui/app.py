@@ -5,12 +5,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Placeholder
 
-
-class OverviewScreen(Screen):
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Placeholder("Overview — coming soon")
-        yield Footer()
+from simledge.tui.screens.overview import OverviewScreen
 
 
 class TransactionsScreen(Screen):
