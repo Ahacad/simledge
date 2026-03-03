@@ -9,13 +9,7 @@ from simledge.tui.screens.overview import OverviewScreen
 from simledge.tui.screens.transactions import TransactionsScreen
 from simledge.tui.screens.accounts import AccountsScreen
 from simledge.tui.screens.trends import TrendsScreen
-
-
-class NetWorthScreen(Screen):
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Placeholder("Net Worth — coming soon")
-        yield Footer()
+from simledge.tui.screens.networth import NetWorthScreen
 
 
 class SimpLedgeApp(App):
