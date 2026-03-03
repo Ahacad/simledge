@@ -6,13 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Placeholder
 
 from simledge.tui.screens.overview import OverviewScreen
-
-
-class TransactionsScreen(Screen):
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Placeholder("Transactions — coming soon")
-        yield Footer()
+from simledge.tui.screens.transactions import TransactionsScreen
 
 
 class AccountsScreen(Screen):
