@@ -293,6 +293,14 @@ TagFilterModal {
     height: 1fr;
 }
 
+#calendar-grid-panel {
+    height: auto;
+}
+
+#calendar-details-panel {
+    height: auto;
+}
+
 /* Budget screen */
 #budget-panel {
     height: 1fr;
