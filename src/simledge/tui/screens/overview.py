@@ -8,7 +8,7 @@ from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
 from textual.widgets import DataTable, Static
 
-from simledge.analysis import monthly_summary, spending_by_category_grouped, recent_transactions, income_by_category
+from simledge.analysis import monthly_summary, spending_by_category_grouped, recent_transactions, income_by_category, yoy_comparison, ytd_comparison
 from simledge.budget import budget_vs_actual, total_budget_summary
 from simledge.config import DB_PATH
 from simledge.goals import all_goals_progress
@@ -31,6 +31,7 @@ class OverviewScreen(Screen):
             yield Vertical(Static("", id="summary-content"), id="summary-panel", classes="panel")
             yield Vertical(Static("", id="category-content"), id="category-panel", classes="panel")
             yield Vertical(Static("", id="budget-overview-content"), id="budget-overview-panel", classes="panel")
+            yield Vertical(Static("", id="yoy-content"), id="yoy-panel", classes="panel")
             yield Vertical(Static("", id="goals-overview-content"), id="goals-overview-panel", classes="panel")
             yield Vertical(DataTable(id="recent-table"), Static("", id="sync-status"), id="recent-panel", classes="panel")
 
@@ -77,6 +78,8 @@ class OverviewScreen(Screen):
         inc_cats = income_by_category(conn, month, account_ids=account_ids)
         budget_items = budget_vs_actual(conn, month, account_ids=account_ids)
         budget_summary = total_budget_summary(conn, month, account_ids=account_ids) if budget_items else None
+        yoy = yoy_comparison(conn, month, account_ids=account_ids)
+        ytd = ytd_comparison(conn, account_ids=account_ids)
         goals_progress = all_goals_progress(conn)
         recent = recent_transactions(conn, limit=10, account_ids=account_ids)
         last_sync = get_last_sync(conn)
@@ -166,6 +169,67 @@ class OverviewScreen(Screen):
             self.query_one("#budget-overview-content", Static).update("\n".join(blines))
         else:
             budget_panel.display = False
+
+        # Year-over-Year panel
+        yoy_panel = self.query_one("#yoy-panel")
+        has_prev = yoy["previous_spending"] != 0 or yoy["previous_income"] != 0
+        if has_prev:
+            yoy_panel.border_title = "Year over Year"
+            yoy_panel.display = True
+            prev_month_name = datetime.strptime(yoy["previous_month"], "%Y-%m").strftime("%b %Y")
+            ylines = [f"vs. {prev_month_name}:"]
+
+            # Spending line
+            prev_s = abs(yoy["previous_spending"])
+            cur_s = abs(yoy["current_spending"])
+            if yoy["spending_change_pct"] is not None:
+                s_pct = yoy["spending_change_pct"]
+                # Less spending = good (green down arrow)
+                if s_pct < 0:
+                    s_arrow, s_color = "\u25bc", "#22c55e"
+                elif s_pct > 0:
+                    s_arrow, s_color = "\u25b2", "#ef4444"
+                else:
+                    s_arrow, s_color = "\u2014", "dim"
+                ylines.append(
+                    f"Spending  ${prev_s:,.0f} \u2192 ${cur_s:,.0f}   [{s_color}]{s_arrow} {abs(s_pct):.1f}%[/]"
+                )
+            else:
+                ylines.append(f"Spending  ${cur_s:,.0f}")
+
+            # Income line
+            prev_i = yoy["previous_income"]
+            cur_i = yoy["current_income"]
+            if yoy["income_change_pct"] is not None:
+                i_pct = yoy["income_change_pct"]
+                # More income = good (green up arrow)
+                if i_pct > 0:
+                    i_arrow, i_color = "\u25b2", "#22c55e"
+                elif i_pct < 0:
+                    i_arrow, i_color = "\u25bc", "#ef4444"
+                else:
+                    i_arrow, i_color = "\u2014", "dim"
+                ylines.append(
+                    f"Income    ${prev_i:,.0f} \u2192 ${cur_i:,.0f}   [{i_color}]{i_arrow} {abs(i_pct):.1f}%[/]"
+                )
+            else:
+                ylines.append(f"Income    ${cur_i:,.0f}")
+
+            # YTD line
+            if ytd["previous_spending"] != 0:
+                ytd_cur = abs(ytd["current_spending"])
+                ytd_prev = abs(ytd["previous_spending"])
+                ytd_pct = ytd["spending_change_pct"]
+                if ytd_pct is not None:
+                    ytd_arrow = "\u25bc" if ytd_pct < 0 else "\u25b2"
+                    ytd_color = "#22c55e" if ytd_pct < 0 else "#ef4444"
+                    ylines.append(
+                        f"\nYTD: ${ytd_cur:,.0f} spent (vs ${ytd_prev:,.0f} last year, [{ytd_color}]{ytd_arrow} {abs(ytd_pct):.1f}%[/])"
+                    )
+
+            self.query_one("#yoy-content", Static).update("\n".join(ylines))
+        else:
+            yoy_panel.display = False
 
         # Goals panel (compact — only if goals exist)
         goals_panel = self.query_one("#goals-overview-panel")

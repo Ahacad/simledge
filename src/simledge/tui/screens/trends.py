@@ -8,7 +8,7 @@ from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
 from textual.widgets import Sparkline, Static
 
-from simledge.analysis import spending_trend, spending_by_category_grouped, income_trend, income_by_category
+from simledge.analysis import spending_trend, spending_by_category_grouped, income_trend, income_by_category, yoy_comparison
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.widgets.navbar import NavBar
@@ -31,6 +31,7 @@ class TrendsScreen(Screen):
                 yield Sparkline([], id="income-sparkline", classes="sparkline-income")
                 yield Static("", id="income-labels")
                 yield Static("", id="income-sources")
+            yield Vertical(Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel")
 
     def on_mount(self):
         self._lookback = 6
@@ -64,6 +65,7 @@ class TrendsScreen(Screen):
         prev_cats = spending_by_category_grouped(conn, prev_month, account_ids=account_ids)
         inc_trend = income_trend(conn, months=self._lookback, account_ids=account_ids)
         inc_cats = income_by_category(conn, current_month, account_ids=account_ids)
+        yoy = yoy_comparison(conn, current_month, account_ids=account_ids)
         conn.close()
 
         # Sparkline chart
@@ -130,3 +132,49 @@ class TrendsScreen(Screen):
             self.query_one("#income-sources", Static).update("\n".join(src_lines))
         else:
             self.query_one("#income-sources", Static).update("[dim]No income this month[/]")
+
+        # YoY category comparison
+        yoy_panel = self.query_one("#yoy-category-panel")
+        has_prev = yoy["previous_spending"] != 0 or yoy["previous_income"] != 0
+        if has_prev:
+            prev_label = datetime.strptime(yoy["previous_month"], "%Y-%m").strftime("%b %Y")
+            yoy_panel.border_title = f"vs. {prev_label} (by category)"
+            yoy_panel.display = True
+            ylines = []
+            total_cur = 0
+            total_prev = 0
+            for c in yoy["categories"]:
+                cur = abs(c["current"])
+                prev = abs(c["previous"])
+                total_cur += cur
+                total_prev += prev
+                if c["previous"] == 0:
+                    ylines.append(f"{c['category']:<14} {'':>7} \u2192 ${cur:>9,.0f}   [dim]new[/]")
+                elif c["current"] == 0:
+                    ylines.append(f"{c['category']:<14} ${prev:>7,.0f} \u2192 {'':>10}   [dim]gone[/]")
+                elif c["change_pct"] is not None:
+                    pct = c["change_pct"]
+                    if pct < 0:
+                        arrow, color = "\u25bc", "#22c55e"
+                    elif pct > 0:
+                        arrow, color = "\u25b2", "#ef4444"
+                    else:
+                        arrow, color = "\u2014", "dim"
+                    ylines.append(
+                        f"{c['category']:<14} ${prev:>7,.0f} \u2192 ${cur:>9,.0f}   [{color}]{arrow} {abs(pct):.1f}%[/]"
+                    )
+            # Total line
+            if total_prev > 0:
+                total_pct = ((total_cur - total_prev) / total_prev) * 100
+                if total_pct < 0:
+                    t_arrow, t_color = "\u25bc", "#22c55e"
+                elif total_pct > 0:
+                    t_arrow, t_color = "\u25b2", "#ef4444"
+                else:
+                    t_arrow, t_color = "\u2014", "dim"
+                ylines.append(
+                    f"\n{'Total':<14} ${total_prev:>7,.0f} \u2192 ${total_cur:>9,.0f}   [{t_color}]{t_arrow} {abs(total_pct):.1f}%[/]"
+                )
+            self.query_one("#yoy-category-content", Static).update("\n".join(ylines))
+        else:
+            yoy_panel.display = False

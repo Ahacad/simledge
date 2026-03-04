@@ -182,6 +182,97 @@ def recent_transactions(conn, limit=20, account_ids=None):
     ]
 
 
+def yoy_comparison(conn, month, account_ids=None):
+    """Compare a month with the same month one year prior."""
+    y, m = month.split("-")
+    previous_month = f"{int(y) - 1}-{m}"
+
+    current = monthly_summary(conn, month, account_ids)
+    previous = monthly_summary(conn, previous_month, account_ids)
+
+    cur_cats = spending_by_category(conn, month, account_ids)
+    prev_cats = spending_by_category(conn, previous_month, account_ids)
+
+    prev_dict = {c["category"]: c["total"] for c in prev_cats}
+    cur_dict = {c["category"]: c["total"] for c in cur_cats}
+    all_cats = set(prev_dict) | set(cur_dict)
+
+    categories = []
+    for cat in all_cats:
+        cur_val = cur_dict.get(cat, 0)
+        prev_val = prev_dict.get(cat, 0)
+        if prev_val != 0:
+            change_pct = ((abs(cur_val) - abs(prev_val)) / abs(prev_val)) * 100
+        else:
+            change_pct = None
+        categories.append({
+            "category": cat,
+            "current": cur_val,
+            "previous": prev_val,
+            "change_pct": change_pct,
+        })
+    categories.sort(key=lambda c: abs(c["current"]), reverse=True)
+
+    def _pct(cur, prev):
+        if prev == 0:
+            return None
+        return ((abs(cur) - abs(prev)) / abs(prev)) * 100
+
+    return {
+        "current_month": month,
+        "previous_month": previous_month,
+        "current_spending": current["total_spending"],
+        "previous_spending": previous["total_spending"],
+        "spending_change_pct": _pct(current["total_spending"], previous["total_spending"]),
+        "current_income": current["total_income"],
+        "previous_income": previous["total_income"],
+        "income_change_pct": _pct(current["total_income"], previous["total_income"]),
+        "categories": categories,
+    }
+
+
+def ytd_comparison(conn, account_ids=None):
+    """Year-to-date spending/income, this year vs last year."""
+    now = datetime.now()
+    current_year = str(now.year)
+    previous_year = str(now.year - 1)
+    current_month_num = f"{now.month:02d}"
+
+    filt, filt_params = _account_filter(account_ids)
+
+    def _ytd_totals(year):
+        row = conn.execute(
+            "SELECT"
+            " COALESCE(SUM(CASE WHEN amount < 0 THEN amount END), 0),"
+            " COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0)"
+            " FROM transactions"
+            " WHERE strftime('%Y', posted) = ?"
+            " AND strftime('%m', posted) <= ?"
+            + filt,
+            [year, current_month_num] + filt_params,
+        ).fetchone()
+        return row[0], row[1]
+
+    cur_spending, cur_income = _ytd_totals(current_year)
+    prev_spending, prev_income = _ytd_totals(previous_year)
+
+    def _pct(cur, prev):
+        if prev == 0:
+            return None
+        return ((abs(cur) - abs(prev)) / abs(prev)) * 100
+
+    return {
+        "current_year": current_year,
+        "months_counted": now.month,
+        "current_spending": cur_spending,
+        "previous_spending": prev_spending,
+        "spending_change_pct": _pct(cur_spending, prev_spending),
+        "current_income": cur_income,
+        "previous_income": prev_income,
+        "income_change_pct": _pct(cur_income, prev_income),
+    }
+
+
 def account_summary(conn, account_ids=None):
     """Return all accounts with latest balance, grouped by institution."""
     filt, filt_params = _account_filter(account_ids, column="a.id")
