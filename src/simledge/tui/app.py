@@ -8,7 +8,7 @@ from textual.widgets import Checkbox, Static
 
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
-from simledge.db import init_db
+from simledge.db import init_db, get_last_sync
 from simledge.sync import run_sync
 from simledge.tui.screens.overview import OverviewScreen
 from simledge.tui.screens.transactions import TransactionsScreen
@@ -181,6 +181,23 @@ class SimpLedgeApp(App):
 
     def on_mount(self):
         self.switch_mode("overview")
+        self._maybe_auto_sync()
+
+    def _maybe_auto_sync(self):
+        """Auto-sync if last successful sync was > 24h ago."""
+        from datetime import datetime, timedelta
+        conn = init_db(DB_PATH)
+        last = get_last_sync(conn)
+        conn.close()
+        if not last:
+            return  # Never synced — user must run setup first
+        try:
+            last_dt = datetime.strptime(last, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return
+        if datetime.now() - last_dt > timedelta(hours=24):
+            self.notify("Auto-syncing (last sync > 24h ago)...")
+            self.run_worker(self._do_sync(), exclusive=True)
 
     def action_show_help(self):
         self.push_screen(HelpScreen())
