@@ -2,7 +2,7 @@
 
 import re
 import statistics
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from simledge.log import setup_logging
 
@@ -127,3 +127,42 @@ def detect_recurring(conn, min_occurrences=3, tolerance_days=5,
     results.sort(key=lambda r: r["next_expected"])
     log.debug("detected %d recurring transactions", len(results))
     return results
+
+
+_FREQ_DAYS = {"weekly": 7, "monthly": 30, "yearly": 365}
+
+
+def generate_occurrences(recurring_item, start_date, end_date):
+    """Generate expected occurrences of a recurring transaction within a date range.
+
+    Returns list of dicts with date, amount, description, account.
+    """
+    freq = recurring_item.get("frequency", "monthly")
+    interval = _FREQ_DAYS.get(freq, 30)
+
+    next_str = recurring_item.get("next_expected", "")
+    try:
+        cursor = datetime.strptime(next_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return []
+
+    if isinstance(start_date, datetime):
+        start_date = start_date.date()
+    if isinstance(end_date, datetime):
+        end_date = end_date.date()
+
+    # Step forward if before start_date
+    while cursor < start_date:
+        cursor += timedelta(days=interval)
+
+    occurrences = []
+    while cursor <= end_date:
+        occurrences.append({
+            "date": cursor.strftime("%Y-%m-%d"),
+            "amount": recurring_item.get("last_amount", 0),
+            "description": recurring_item.get("description", ""),
+            "account": recurring_item.get("account", ""),
+        })
+        cursor += timedelta(days=interval)
+
+    return occurrences

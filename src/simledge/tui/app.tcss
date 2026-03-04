@@ -83,6 +83,13 @@ Sparkline {
     color: #22c55e 30%;
 }
 
+.sparkline-projection > .sparkline--max-color {
+    color: #2dd4bf;
+}
+.sparkline-projection > .sparkline--min-color {
+    color: #2dd4bf 30%;
+}
+
 /* Help modal */
 HelpScreen {
     align: center middle;

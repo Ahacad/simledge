@@ -35,6 +35,10 @@ HELP_TEXT = """\
   [bold]h/←[/]  Prev month   [bold]l/→[/]  Next month
   [bold]t[/]  Today          [bold]-/+[/]  Adjust range
 
+[bold]Net Worth Screen[/]
+  [bold]-/+[/]  Adjust history range
+  Cash flow projection panel shows 90-day forecast
+
 [bold]Actions[/]
   [bold]s[/]  Sync from SimpleFIN
   [bold]a[/]  Filter accounts
