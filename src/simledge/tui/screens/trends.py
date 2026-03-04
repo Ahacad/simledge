@@ -1,4 +1,4 @@
-"""Trends screen — monthly spending sparkline and category comparisons."""
+"""Trends screen — monthly spending and income charts with category comparisons."""
 
 from datetime import datetime
 
@@ -6,11 +6,12 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
-from textual.widgets import Sparkline, Static
+from textual.widgets import Static
 
 from simledge.analysis import spending_trend, spending_by_category_grouped, income_trend, income_by_category, yoy_comparison
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.charts import render_bar_chart, TEAL, GREEN
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -24,12 +25,10 @@ class TrendsScreen(Screen):
         yield NavBar("trends")
         with VerticalScroll():
             with Vertical(id="chart-panel", classes="panel"):
-                yield Sparkline([], id="spending-sparkline", classes="sparkline-spending")
-                yield Static("", id="chart-labels")
+                yield Static("", id="spending-chart")
             yield Vertical(Static("", id="comparison-content"), id="comparison-panel", classes="panel")
             with Vertical(id="income-panel", classes="panel"):
-                yield Sparkline([], id="income-sparkline", classes="sparkline-income")
-                yield Static("", id="income-labels")
+                yield Static("", id="income-chart")
                 yield Static("", id="income-sources")
             yield Vertical(Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel")
 
@@ -68,17 +67,17 @@ class TrendsScreen(Screen):
         yoy = yoy_comparison(conn, current_month, account_ids=account_ids)
         conn.close()
 
-        # Sparkline chart
+        # Spending chart
         if trend:
             month_labels = [t["month"][5:] for t in trend]
             values = [abs(t["total"]) for t in trend]
-            self.query_one("#spending-sparkline", Sparkline).data = values
+            w = max(40, self.app.size.width - 8)
+            chart = render_bar_chart(values, month_labels, width=w, height=12, color=TEAL)
+            self.query_one("#spending-chart", Static).update(chart)
             self.query_one("#chart-panel").border_title = f"Monthly Spending ({self._lookback}mo)"
-            label_str = "  ".join(f"[dim]{m}[/]" for m in month_labels)
-            self.query_one("#chart-labels", Static).update(label_str)
         else:
             self.query_one("#chart-panel").border_title = f"Monthly Spending ({self._lookback}mo)"
-            self.query_one("#chart-labels", Static).update("[dim]No data yet[/]")
+            self.query_one("#spending-chart", Static).update("[dim]No data yet[/]")
 
         # Category comparison
         self.query_one("#comparison-panel").border_title = f"{prev_month[5:]} → {current_month[5:]}"
@@ -109,13 +108,11 @@ class TrendsScreen(Screen):
         if inc_trend:
             inc_labels = [t["month"][5:] for t in inc_trend]
             inc_values = [t["total"] for t in inc_trend]
-            self.query_one("#income-sparkline", Sparkline).data = inc_values
-            self.query_one("#income-labels", Static).update(
-                "  ".join(f"[dim]{m}[/]" for m in inc_labels)
-            )
+            w = max(40, self.app.size.width - 8)
+            chart = render_bar_chart(inc_values, inc_labels, width=w, height=12, color=GREEN)
+            self.query_one("#income-chart", Static).update(chart)
         else:
-            self.query_one("#income-sparkline", Sparkline).data = []
-            self.query_one("#income-labels", Static).update("[dim]No income data yet[/]")
+            self.query_one("#income-chart", Static).update("[dim]No income data yet[/]")
 
         if inc_cats:
             total_inc = sum(c["total"] for c in inc_cats)

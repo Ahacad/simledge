@@ -1,15 +1,16 @@
-"""Net Worth screen — net worth over time with sparkline chart."""
+"""Net Worth screen — net worth over time with plotext chart."""
 
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
-from textual.widgets import Sparkline, Static
+from textual.widgets import Static
 
 from simledge.analysis import net_worth_history
 from simledge.cashflow import project_balances
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.charts import render_line_chart, GREEN, TEAL
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -23,12 +24,10 @@ class NetWorthScreen(Screen):
         yield NavBar("networth")
         with VerticalScroll():
             with Vertical(id="nw-chart-panel", classes="panel"):
-                yield Sparkline([], id="nw-sparkline", classes="sparkline-networth")
-                yield Static("", id="nw-chart-labels")
+                yield Static("", id="nw-chart")
             yield Vertical(Static("", id="nw-summary"), id="nw-summary-panel", classes="panel")
             with Vertical(id="cf-panel", classes="panel"):
-                yield Sparkline([], id="cf-sparkline", classes="sparkline-projection")
-                yield Static("", id="cf-labels")
+                yield Static("", id="cf-chart")
                 yield Static("", id="cf-summary")
                 yield Static("", id="cf-warnings")
 
@@ -56,7 +55,7 @@ class NetWorthScreen(Screen):
 
         if not history:
             chart_panel.border_title = f"Net Worth ({self._lookback}mo)"
-            self.query_one("#nw-chart-labels", Static).update("[dim]No balance data yet. Run: simledge sync[/]")
+            self.query_one("#nw-chart", Static).update("[dim]No balance data yet. Run: simledge sync[/]")
             summary_panel.border_title = "Current"
             self.query_one("#nw-summary", Static).update("[dim]No data[/]")
             self._refresh_cashflow(conn, account_ids)
@@ -66,11 +65,10 @@ class NetWorthScreen(Screen):
         month_labels = [h["month"][5:] for h in history]
         values = [h["net_worth"] for h in history]
 
-        # Sparkline
-        self.query_one("#nw-sparkline", Sparkline).data = values
+        w = max(40, self.app.size.width - 8)
+        chart = render_line_chart(values, month_labels, width=w, height=12, color=GREEN)
+        self.query_one("#nw-chart", Static).update(chart)
         chart_panel.border_title = f"Net Worth ({self._lookback}mo)"
-        label_str = "  ".join(f"[dim]{m}[/]" for m in month_labels)
-        self.query_one("#nw-chart-labels", Static).update(label_str)
 
         # Summary
         summary_panel.border_title = "Current"
@@ -93,8 +91,7 @@ class NetWorthScreen(Screen):
 
     def _refresh_cashflow(self, conn, account_ids):
         cf_panel = self.query_one("#cf-panel")
-        cf_sparkline = self.query_one("#cf-sparkline", Sparkline)
-        cf_labels = self.query_one("#cf-labels", Static)
+        cf_chart = self.query_one("#cf-chart", Static)
         cf_summary_w = self.query_one("#cf-summary", Static)
         cf_warnings = self.query_one("#cf-warnings", Static)
 
@@ -102,8 +99,7 @@ class NetWorthScreen(Screen):
             projection = project_balances(conn, days=90, account_ids=account_ids)
         except Exception:
             cf_panel.border_title = "Cash Flow Projection (90 days)"
-            cf_labels.update("[dim]Projection unavailable[/]")
-            cf_sparkline.data = []
+            cf_chart.update("[dim]Projection unavailable[/]")
             cf_summary_w.update("")
             cf_warnings.update("")
             return
@@ -111,11 +107,10 @@ class NetWorthScreen(Screen):
         daily = projection["daily_totals"]
         if not daily:
             cf_panel.border_title = "Cash Flow Projection (90 days)"
-            cf_labels.update(
+            cf_chart.update(
                 "[dim]No recurring transactions detected — projection unavailable. "
                 "Run sync to build transaction history.[/]"
             )
-            cf_sparkline.data = []
             cf_summary_w.update("")
             cf_warnings.update("")
             return
@@ -126,25 +121,16 @@ class NetWorthScreen(Screen):
 
         cf_panel.border_title = "Cash Flow Projection (90 days)"
 
-        # Sparkline data
+        # Chart data
         values = [d["projected_balance"] for d in daily]
-        cf_sparkline.data = values
-
-        # Date labels — ~5 evenly spaced
-        n = len(daily)
-        if n >= 5:
-            step = n // 4
-            indices = [0, step, step * 2, step * 3, n - 1]
-        else:
-            indices = list(range(n))
-        date_labels = []
-        for i in indices:
-            d = daily[i]["date"]
-            # Format as "Mon D" e.g. "Mar 3"
-            from datetime import datetime
-            dt = datetime.strptime(d, "%Y-%m-%d")
-            date_labels.append(dt.strftime("%b %-d"))
-        cf_labels.update("  ".join(f"[dim]{lbl}[/]" for lbl in date_labels))
+        from datetime import datetime
+        date_labels_full = []
+        for d in daily:
+            dt = datetime.strptime(d["date"], "%Y-%m-%d")
+            date_labels_full.append(dt.strftime("%b %-d"))
+        w = max(40, self.app.size.width - 8)
+        chart = render_line_chart(values, date_labels_full, width=w, height=12, color=TEAL)
+        cf_chart.update(chart)
 
         # Summary line
         cur = summary["current_total"]

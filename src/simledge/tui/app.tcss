@@ -55,39 +55,10 @@ NavBar {
     color: $text-muted;
 }
 
-/* Sparkline charts */
-Sparkline {
+/* Chart panels */
+#nw-chart, #cf-chart, #spending-chart, #income-chart {
+    height: auto;
     width: 100%;
-    height: 3;
-    margin: 0 0;
-}
-
-.sparkline-spending > .sparkline--max-color {
-    color: #2dd4bf;
-}
-.sparkline-spending > .sparkline--min-color {
-    color: #2dd4bf 30%;
-}
-
-.sparkline-networth > .sparkline--max-color {
-    color: #22c55e;
-}
-.sparkline-networth > .sparkline--min-color {
-    color: #22c55e 30%;
-}
-
-.sparkline-income > .sparkline--max-color {
-    color: #22c55e;
-}
-.sparkline-income > .sparkline--min-color {
-    color: #22c55e 30%;
-}
-
-.sparkline-projection > .sparkline--max-color {
-    color: #2dd4bf;
-}
-.sparkline-projection > .sparkline--min-color {
-    color: #2dd4bf 30%;
 }
 
 /* Help modal */
