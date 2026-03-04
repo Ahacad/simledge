@@ -1,7 +1,7 @@
 """Accounts screen — balances grouped by institution."""
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
 from textual.widgets import Static
 
@@ -14,18 +14,19 @@ from simledge.tui.widgets.navbar import NavBar
 class AccountsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield NavBar("accounts")
-        with VerticalScroll():
-            yield Static("", id="accounts-content")
+        yield VerticalScroll(id="accounts-scroll")
 
     def on_mount(self):
         conn = init_db(DB_PATH)
         accounts = account_summary(conn)
         conn.close()
 
+        scroll = self.query_one("#accounts-scroll", VerticalScroll)
+
         if not accounts:
-            self.query_one("#accounts-content", Static).update(
-                "\n  No accounts yet. Run: simledge sync"
-            )
+            panel = Vertical(Static("[dim]No accounts yet. Run: simledge sync[/]"), classes="panel")
+            panel.border_title = "Accounts"
+            scroll.mount(panel)
             return
 
         # Group by institution
@@ -41,21 +42,23 @@ class AccountsScreen(Screen):
             else:
                 total_debt += bal
 
-        lines = ["\n"]
         for inst, accts in groups.items():
-            lines.append(f"  {inst}")
-            underline = "\u2500" * len(inst)
-            lines.append(f"  {underline}")
+            lines = []
             for a in accts:
                 bal = a["balance"] or 0
-                color = "[green]" if bal >= 0 else "[red]"
-                lines.append(f"    {a['name']:<30} {color}${bal:>12,.2f}[/]")
-            lines.append("")
+                color = "#22c55e" if bal >= 0 else "#ef4444"
+                lines.append(f"{a['name']:<30} [{color}]${bal:>12,.2f}[/]")
+            panel = Vertical(Static("\n".join(lines)), classes="panel")
+            panel.border_title = inst
+            scroll.mount(panel)
 
-        separator = "\u2501" * 50
-        lines.append(f"  {separator}")
-        lines.append(f"  Total Assets:  [green]${total_assets:>12,.2f}[/]")
-        lines.append(f"  Total Debt:    [red]${total_debt:>12,.2f}[/]")
-        lines.append(f"  Net Worth:     ${total_assets + total_debt:>12,.2f}")
-
-        self.query_one("#accounts-content", Static).update("\n".join(lines))
+        # Summary panel
+        net = total_assets + total_debt
+        summary_lines = [
+            f"[bold]Assets:[/]   [#22c55e]${total_assets:>12,.2f}[/]",
+            f"[bold]Debt:[/]     [#ef4444]${total_debt:>12,.2f}[/]",
+            f"[bold]Net Worth:[/] ${net:>12,.2f}",
+        ]
+        summary = Vertical(Static("\n".join(summary_lines)), classes="panel")
+        summary.border_title = "Summary"
+        scroll.mount(summary)

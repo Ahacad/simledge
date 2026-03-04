@@ -1,31 +1,26 @@
-"""Trends screen — monthly spending chart and category comparisons."""
+"""Trends screen — monthly spending sparkline and category comparisons."""
 
 from datetime import datetime
 
-from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Sparkline, Static
 
 from simledge.analysis import spending_trend, spending_by_category
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.widgets.navbar import NavBar
 
-try:
-    import plotext as plt
-    HAS_PLOTEXT = True
-except ImportError:
-    HAS_PLOTEXT = False
-
 
 class TrendsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield NavBar("trends")
         with VerticalScroll():
-            yield Static("", id="trends-chart")
-            yield Static("", id="trends-content")
+            with Vertical(id="chart-panel", classes="panel"):
+                yield Sparkline([], id="spending-sparkline", classes="sparkline-spending")
+                yield Static("", id="chart-labels")
+            yield Vertical(Static("", id="comparison-content"), id="comparison-panel", classes="panel")
 
     def on_mount(self):
         conn = init_db(DB_PATH)
@@ -44,31 +39,23 @@ class TrendsScreen(Screen):
         prev_cats = spending_by_category(conn, prev_month)
         conn.close()
 
-        chart_widget = self.query_one("#trends-chart", Static)
-        text_widget = self.query_one("#trends-content", Static)
-
-        # Chart — convert ANSI to Rich Text so Textual can render it
-        if trend and HAS_PLOTEXT:
+        # Sparkline chart
+        if trend:
             month_labels = [t["month"][5:] for t in trend]
-            values = [t["total"] for t in trend]
-            plt.clear_figure()
-            x = list(range(len(month_labels)))
-            plt.bar(x, [abs(v) for v in values])
-            plt.xticks(x, month_labels)
-            plt.title("Monthly Spending")
-            plt.theme("dark")
-            plt.plotsize(60, 15)
-            chart_widget.update(Text.from_ansi(plt.build()))
+            values = [abs(t["total"]) for t in trend]
+            self.query_one("#spending-sparkline", Sparkline).data = values
+            self.query_one("#chart-panel").border_title = f"Monthly Spending ({len(trend)}mo)"
+            label_str = "  ".join(f"[dim]{m}[/]" for m in month_labels)
+            self.query_one("#chart-labels", Static).update(label_str)
         else:
-            chart_widget.update("")
+            self.query_one("#chart-panel").border_title = "Monthly Spending"
+            self.query_one("#chart-labels", Static).update("[dim]No data yet[/]")
 
         # Category comparison
+        self.query_one("#comparison-panel").border_title = f"{prev_month[5:]} \u2192 {current_month[5:]}"
         lines = []
         if current_cats or prev_cats:
             prev_dict = {c["category"]: c["total"] for c in prev_cats}
-            lines.append(f"  Category Comparison ({prev_month[5:]} \u2192 {current_month[5:]})")
-            separator = "\u2500" * 50
-            lines.append(f"  {separator}")
             for c in current_cats:
                 cat = c["category"]
                 cur = c["total"]
@@ -76,14 +63,14 @@ class TrendsScreen(Screen):
                 if prev != 0:
                     change = ((cur - prev) / abs(prev)) * 100
                     arrow = "\u25b2" if change > 0 else "\u25bc"
+                    color = "#ef4444" if change > 0 else "#22c55e"
                     lines.append(
-                        f"  {cat:<18} ${abs(prev):>9,.2f} \u2192 ${abs(cur):>9,.2f}  {arrow} {abs(change):.0f}%"
+                        f"{cat:<18} [bold]${abs(prev):>9,.2f}[/] \u2192 [bold]${abs(cur):>9,.2f}[/]  [{color}]{arrow} {abs(change):.0f}%[/]"
                     )
                 else:
-                    dash = "\u2014"
-                    lines.append(f"  {cat:<18} {dash:>11} \u2192 ${abs(cur):>9,.2f}  new")
+                    lines.append(f"{cat:<18} {'':>11} \u2192 [bold]${abs(cur):>9,.2f}[/]  [dim]new[/]")
 
-        if not trend and not current_cats:
-            lines.append("  No data yet. Run: simledge sync")
+        if not lines:
+            lines.append("[dim]No comparison data yet. Run: simledge sync[/]")
 
-        text_widget.update("\n".join(lines))
+        self.query_one("#comparison-content", Static).update("\n".join(lines))

@@ -1,72 +1,62 @@
-"""Net Worth screen — net worth over time with chart."""
+"""Net Worth screen — net worth over time with sparkline chart."""
 
-from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Sparkline, Static
 
 from simledge.analysis import net_worth_history
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.widgets.navbar import NavBar
 
-try:
-    import plotext as plt
-    HAS_PLOTEXT = True
-except ImportError:
-    HAS_PLOTEXT = False
-
 
 class NetWorthScreen(Screen):
     def compose(self) -> ComposeResult:
         yield NavBar("networth")
         with VerticalScroll():
-            yield Static("", id="networth-chart")
-            yield Static("", id="networth-content")
+            with Vertical(id="nw-chart-panel", classes="panel"):
+                yield Sparkline([], id="nw-sparkline", classes="sparkline-networth")
+                yield Static("", id="nw-chart-labels")
+            yield Vertical(Static("", id="nw-summary"), id="nw-summary-panel", classes="panel")
 
     def on_mount(self):
         conn = init_db(DB_PATH)
         history = net_worth_history(conn, months=12)
         conn.close()
 
-        chart_widget = self.query_one("#networth-chart", Static)
-        text_widget = self.query_one("#networth-content", Static)
+        chart_panel = self.query_one("#nw-chart-panel")
+        summary_panel = self.query_one("#nw-summary-panel")
 
         if not history:
-            chart_widget.update("")
-            text_widget.update("\n  No balance data yet. Run: simledge sync")
+            chart_panel.border_title = "Net Worth"
+            self.query_one("#nw-chart-labels", Static).update("[dim]No balance data yet. Run: simledge sync[/]")
+            summary_panel.border_title = "Current"
+            self.query_one("#nw-summary", Static).update("[dim]No data[/]")
             return
 
         month_labels = [h["month"][5:] for h in history]
         values = [h["net_worth"] for h in history]
 
-        # Chart — convert ANSI to Rich Text so Textual can render it
-        if HAS_PLOTEXT and len(history) > 1:
-            plt.clear_figure()
-            x = list(range(len(month_labels)))
-            plt.plot(x, values, marker="braille")
-            plt.xticks(x, month_labels)
-            plt.title("Net Worth Over Time")
-            plt.theme("dark")
-            plt.plotsize(60, 15)
-            chart_widget.update(Text.from_ansi(plt.build()))
-        else:
-            chart_widget.update("")
+        # Sparkline
+        self.query_one("#nw-sparkline", Sparkline).data = values
+        chart_panel.border_title = f"Net Worth ({len(history)}mo)"
+        label_str = "  ".join(f"[dim]{m}[/]" for m in month_labels)
+        self.query_one("#nw-chart-labels", Static).update(label_str)
 
-        # Current + change
-        lines = []
+        # Summary
+        summary_panel.border_title = "Current"
         current = values[-1] if values else 0
-        lines.append(f"  Current Net Worth: ${current:,.2f}")
+        lines = [f"[bold]Net Worth:[/] ${current:,.2f}"]
 
         if len(values) >= 2:
             prev = values[-2]
             change = current - prev
             pct = (change / abs(prev) * 100) if prev != 0 else 0
             arrow = "\u25b2" if change >= 0 else "\u25bc"
-            color = "[green]" if change >= 0 else "[red]"
+            color = "#22c55e" if change >= 0 else "#ef4444"
             lines.append(
-                f"  30-day Change: {color}{arrow} ${abs(change):,.2f} ({pct:+.1f}%)[/]"
+                f"[bold]30-day Change:[/] [{color}]{arrow} ${abs(change):,.2f} ({pct:+.1f}%)[/]"
             )
 
-        text_widget.update("\n".join(lines))
+        self.query_one("#nw-summary", Static).update("\n".join(lines))
