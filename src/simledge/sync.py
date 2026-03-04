@@ -233,6 +233,17 @@ async def run_sync(full=False, start_date=None, quiet=False):
         txn_count += 1
 
     log_sync(conn, len(accounts), txn_count)
+
+    # Auto-apply category rules from TOML
+    from simledge.categorize import apply_rules, load_rules
+    from simledge.config import RULES_PATH
+
+    rules = load_rules(RULES_PATH)
+    if rules:
+        cat_count = apply_rules(rules, conn)
+        if cat_count and not quiet:
+            print(f"Auto-categorized {cat_count} transactions")
+
     if not quiet:
         print(f"Synced {len(accounts)} accounts, {txn_count} transactions")
     conn.close()
