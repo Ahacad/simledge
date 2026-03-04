@@ -16,7 +16,7 @@ SimpleFIN API → simledge sync → SQLite → simledge TUI
 ## Tech Stack
 
 - Python 3.11+, `uv` package manager, hatchling build
-- textual (TUI), httpx (HTTP), plotext (charts)
+- textual (TUI), httpx (HTTP)
 - SQLite (stdlib), tomllib (stdlib)
 - pytest for testing
 
@@ -63,6 +63,25 @@ This app handles real bank credentials and financial data. Treat every piece of 
 - **Export files** contain raw financial data. Never read, display, or commit them.
 - **In code**: sanitize log messages, never log transaction details or balances at INFO level or above, never include real amounts in error messages
 - **In tests**: always use obviously fake data (amounts like 100.00, descriptions like "TEST_MERCHANT")
+
+## TUI Visual Style
+
+lazygit-inspired dense panels. Do NOT deviate from this style.
+
+- **Dark + teal accent** (`#2dd4bf`). Green `#22c55e` for income/gains, red `#ef4444` for spending/losses.
+- **Every section in a bordered panel** — `Vertical(classes="panel")` with `border_title`. No raw Static text dumps.
+- **No Header or Footer** — NavBar is the only chrome (1 line, top). Active tab: dark text on teal background.
+- **Charts use Textual Sparkline** — not plotext. Sparkline colors set via TCSS component classes.
+- **Borders**: `round #444` style. Help modal uses `round #2dd4bf`.
+- **Dynamic panels** (e.g. Accounts per-institution) mounted at runtime via `scroll.mount(panel)`.
+- **All styling in `app.tcss`** — screens define structure, TCSS defines appearance.
+
+## Commits and Docs
+
+- **NEVER commit `docs/` directory** — design docs and plans are local working notes, not shipped artifacts
+- Auto-commit after each logical chunk
+- Conventional Commits: `type(scope): description`
+- Run `pytest` before committing
 
 ## Code Conventions
 

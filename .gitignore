@@ -6,6 +6,9 @@ dist/
 *.db
 .worktrees/
 
+# Working notes — not shipped
+docs/
+
 # Sensitive data — NEVER commit
 *.toml.bak
 simplefin-raw*.json
