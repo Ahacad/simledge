@@ -12,6 +12,7 @@ from simledge.analysis import monthly_summary, spending_by_category_grouped, rec
 from simledge.budget import budget_vs_actual, total_budget_summary
 from simledge.config import DB_PATH
 from simledge.goals import all_goals_progress
+from simledge.watchlist import get_watchlists, all_watchlist_spending
 from simledge.db import init_db, get_last_sync
 from simledge.tui.widgets.navbar import NavBar
 
@@ -33,6 +34,7 @@ class OverviewScreen(Screen):
             yield Vertical(Static("", id="budget-overview-content"), id="budget-overview-panel", classes="panel")
             yield Vertical(Static("", id="yoy-content"), id="yoy-panel", classes="panel")
             yield Vertical(Static("", id="goals-overview-content"), id="goals-overview-panel", classes="panel")
+            yield Vertical(Static("", id="watchlist-overview-content"), id="watchlist-overview-panel", classes="panel")
             yield Vertical(DataTable(id="recent-table"), Static("", id="sync-status"), id="recent-panel", classes="panel")
 
     def on_mount(self):
@@ -81,6 +83,8 @@ class OverviewScreen(Screen):
         yoy = yoy_comparison(conn, month, account_ids=account_ids)
         ytd = ytd_comparison(conn, account_ids=account_ids)
         goals_progress = all_goals_progress(conn)
+        watchlists_exist = bool(get_watchlists(conn))
+        wl_items = all_watchlist_spending(conn, month, account_ids=account_ids) if watchlists_exist else []
         recent = recent_transactions(conn, limit=10, account_ids=account_ids)
         last_sync = get_last_sync(conn)
         txn_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
@@ -249,6 +253,40 @@ class OverviewScreen(Screen):
             self.query_one("#goals-overview-content", Static).update("\n".join(glines))
         else:
             goals_panel.display = False
+
+        # Watchlist overview panel
+        wl_panel = self.query_one("#watchlist-overview-panel")
+        if wl_items:
+            wl_panel.border_title = "Watchlists"
+            wl_panel.display = True
+            bar_char = "\u2588"
+            empty_char = "\u2591"
+            bw = 20
+            wlines = []
+            show_items = wl_items[:5]
+            for item in show_items:
+                name = item["name"]
+                if item["monthly_target"]:
+                    pct = item["pct_used"]
+                    filled = min(int(bw * pct / 100), bw)
+                    if pct > 100:
+                        color = "#ef4444"
+                    elif pct >= 80:
+                        color = "#eab308"
+                    else:
+                        color = "#22c55e"
+                    bar = f"[{color}]{bar_char * filled}[/][#333]{empty_char * (bw - filled)}[/]"
+                    warn = " \u26a0" if item["projected_month_end"] > item["monthly_target"] else ""
+                    wlines.append(f"{name:<14} {bar} {pct:>5.1f}%{warn}")
+                else:
+                    wlines.append(
+                        f"{name:<14} ${item['actual']:,.2f} \u00b7 {item['transaction_count']} txns"
+                    )
+            if len(wl_items) > 5:
+                wlines.append(f"[dim]... and {len(wl_items) - 5} more (press 0)[/]")
+            self.query_one("#watchlist-overview-content", Static).update("\n".join(wlines))
+        else:
+            wl_panel.display = False
 
         # Recent transactions
         table = self.query_one("#recent-table", DataTable)

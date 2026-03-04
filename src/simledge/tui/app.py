@@ -19,6 +19,7 @@ from simledge.tui.screens.rules import RulesScreen
 from simledge.tui.screens.recurring import RecurringScreen
 from simledge.tui.screens.budget import BudgetScreen
 from simledge.tui.screens.goals import GoalsScreen
+from simledge.tui.screens.watchlist import WatchlistScreen
 
 
 HELP_TEXT = """\
@@ -29,7 +30,7 @@ HELP_TEXT = """\
   [bold]3[/]  Accounts      [bold]4[/]  Trends
   [bold]5[/]  Net Worth     [bold]6[/]  Rules
   [bold]7[/]  Bills         [bold]8[/]  Budget
-  [bold]9[/]  Goals
+  [bold]9[/]  Goals         [bold]0[/]  Watchlists
 
 [bold]Date Navigation[/]
   [bold]h/←[/]  Prev month   [bold]l/→[/]  Next month
@@ -53,6 +54,11 @@ HELP_TEXT = """\
   [bold]Enter[/]  Edit rule  [bold]r[/]  Apply rules
   [bold]t[/]  Test (dry run)
 
+[bold]Bills Screen[/]
+  [bold]v[/]  Toggle list/calendar view
+  [bold]h/l[/]  Prev/next month (calendar)
+  [bold]t[/]  Today (calendar)
+
 [bold]Budget Screen[/]
   [bold]n[/]  New budget     [bold]d[/]  Delete budget
   [bold]Enter[/]  Edit budget
@@ -60,6 +66,10 @@ HELP_TEXT = """\
 [bold]Goals Screen[/]
   [bold]n[/]  New goal       [bold]d[/]  Delete goal
   [bold]Enter[/]  Edit goal
+
+[bold]Watchlists Screen[/]
+  [bold]n[/]  New watchlist   [bold]d[/]  Delete watchlist
+  [bold]Enter[/]  Edit watchlist
 """
 
 
@@ -145,6 +155,7 @@ class SimpLedgeApp(App):
         Binding("7", "switch_mode('recurring')", "Bills", priority=True, show=False),
         Binding("8", "switch_mode('budget')", "Budget", priority=True, show=False),
         Binding("9", "switch_mode('goals')", "Goals", priority=True, show=False),
+        Binding("0", "switch_mode('watchlist')", "Watchlists", priority=True, show=False),
         Binding("s", "sync", "Sync", priority=True, show=False),
         Binding("a", "show_filter", "Filter", priority=True, show=False),
         Binding("question_mark", "show_help", "? Help", priority=True, show=False),
@@ -161,6 +172,7 @@ class SimpLedgeApp(App):
         "recurring": RecurringScreen,
         "budget": BudgetScreen,
         "goals": GoalsScreen,
+        "watchlist": WatchlistScreen,
     }
 
     def __init__(self):

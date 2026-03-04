@@ -386,3 +386,50 @@ GoalModal {
     height: 1;
     text-align: center;
 }
+
+/* Watchlist screen */
+#watchlist-scroll {
+    height: 1fr;
+}
+
+#watchlist-cards-panel {
+    height: auto;
+}
+
+#watchlist-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+/* Watchlist modal */
+WatchlistModal {
+    align: center middle;
+}
+
+#watchlist-modal-box {
+    width: 50;
+    height: auto;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#watchlist-modal-title {
+    height: 1;
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#watchlist-modal-box Input {
+    margin: 0 0 1 0;
+}
+
+#watchlist-modal-box Input:focus {
+    border: round #2dd4bf;
+}
+
+#watchlist-modal-hint {
+    height: auto;
+    text-align: center;
+}

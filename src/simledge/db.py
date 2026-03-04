@@ -83,6 +83,16 @@ CREATE TABLE IF NOT EXISTS goals (
     starting_balance REAL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS watchlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    monthly_target REAL,
+    filter_category TEXT,
+    filter_tag TEXT,
+    filter_description TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
