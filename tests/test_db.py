@@ -89,3 +89,60 @@ def test_snapshot_balance(tmp_path):
                        ("acct-1", "2026-03-01")).fetchone()
     assert row[0] == 4235.00
     conn.close()
+
+
+def _setup_txn(tmp_path):
+    from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
+    db_path = str(tmp_path / "test.db")
+    conn = init_db(db_path)
+    upsert_institution(conn, "bank-1", "Test Bank", "test.com")
+    upsert_account(conn, "acct-1", "bank-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "txn-1", "acct-1", "2026-03-01", -100.00, "TEST_MERCHANT")
+    return conn
+
+
+def test_update_transaction_field_category(tmp_path):
+    from simledge.db import update_transaction_field
+    conn = _setup_txn(tmp_path)
+    update_transaction_field(conn, "txn-1", "category", "groceries")
+    row = conn.execute("SELECT category FROM transactions WHERE id = ?", ("txn-1",)).fetchone()
+    assert row[0] == "groceries"
+    conn.close()
+
+
+def test_update_transaction_field_notes(tmp_path):
+    from simledge.db import update_transaction_field
+    conn = _setup_txn(tmp_path)
+    update_transaction_field(conn, "txn-1", "notes", "weekly shopping")
+    row = conn.execute("SELECT notes FROM transactions WHERE id = ?", ("txn-1",)).fetchone()
+    assert row[0] == "weekly shopping"
+    conn.close()
+
+
+def test_update_transaction_field_rejects_invalid(tmp_path):
+    import pytest
+    from simledge.db import update_transaction_field
+    conn = _setup_txn(tmp_path)
+    with pytest.raises(ValueError, match="not editable"):
+        update_transaction_field(conn, "txn-1", "amount", "999")
+    conn.close()
+
+
+def test_get_transaction(tmp_path):
+    from simledge.db import get_transaction
+    conn = _setup_txn(tmp_path)
+    txn = get_transaction(conn, "txn-1")
+    assert txn["id"] == "txn-1"
+    assert txn["description"] == "TEST_MERCHANT"
+    assert txn["amount"] == -100.00
+    assert txn["account"] == "Checking"
+    assert txn["institution"] == "Test Bank"
+    conn.close()
+
+
+def test_get_transaction_missing(tmp_path):
+    from simledge.db import get_transaction, init_db
+    db_path = str(tmp_path / "test.db")
+    conn = init_db(db_path)
+    assert get_transaction(conn, "nonexistent") is None
+    conn.close()

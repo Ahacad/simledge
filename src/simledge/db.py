@@ -63,6 +63,10 @@ def init_db(db_path):
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
+    # Migration: add notes column if missing
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()}
+    if "notes" not in cols:
+        conn.execute("ALTER TABLE transactions ADD COLUMN notes TEXT")
     conn.commit()
     log.debug("database initialized at %s", db_path)
     return conn
@@ -123,3 +127,36 @@ def get_last_sync(conn):
         "SELECT synced_at FROM sync_log WHERE status='success' ORDER BY id DESC LIMIT 1"
     ).fetchone()
     return row[0] if row else None
+
+
+EDITABLE_TXN_FIELDS = {"category", "notes"}
+
+
+def update_transaction_field(conn, txn_id, field, value):
+    if field not in EDITABLE_TXN_FIELDS:
+        raise ValueError(f"field {field!r} is not editable")
+    conn.execute(
+        f"UPDATE transactions SET {field} = ? WHERE id = ?",
+        (value, txn_id),
+    )
+    conn.commit()
+
+
+def get_transaction(conn, txn_id):
+    row = conn.execute(
+        "SELECT t.id, t.posted, t.amount, t.description, t.category, t.notes,"
+        " t.pending, a.name, i.name"
+        " FROM transactions t"
+        " JOIN accounts a ON t.account_id = a.id"
+        " LEFT JOIN institutions i ON a.institution_id = i.id"
+        " WHERE t.id = ?",
+        (txn_id,),
+    ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0], "posted": row[1], "amount": row[2],
+        "description": row[3], "category": row[4] or "",
+        "notes": row[5] or "", "pending": bool(row[6]),
+        "account": row[7], "institution": row[8] or "",
+    }
