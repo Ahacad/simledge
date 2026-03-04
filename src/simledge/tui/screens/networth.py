@@ -45,6 +45,9 @@ class NetWorthScreen(Screen):
             self._lookback += 1
             self._refresh_data()
 
+    def on_resize(self, event):
+        self._refresh_data()
+
     def _refresh_data(self):
         conn = init_db(DB_PATH)
         account_ids = self.app.active_account_ids
