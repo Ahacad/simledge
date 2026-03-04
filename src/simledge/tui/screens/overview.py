@@ -3,9 +3,9 @@
 from datetime import datetime
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Label, Static
+from textual.widgets import DataTable, Static
 
 from simledge.analysis import monthly_summary, spending_by_category, recent_transactions
 from simledge.config import DB_PATH
@@ -17,12 +17,9 @@ class OverviewScreen(Screen):
     def compose(self) -> ComposeResult:
         yield NavBar("overview")
         with VerticalScroll():
-            yield Label("", id="month-header")
-            yield Label("", id="summary-line")
-            yield Static("", id="category-section")
-            yield Label("\n  Recent Transactions", id="recent-label")
-            yield DataTable(id="recent-table")
-            yield Label("", id="sync-status")
+            yield Vertical(Static("", id="summary-content"), id="summary-panel", classes="panel")
+            yield Vertical(Static("", id="category-content"), id="category-panel", classes="panel")
+            yield Vertical(DataTable(id="recent-table"), Static("", id="sync-status"), id="recent-panel", classes="panel")
 
     def on_mount(self):
         self._refresh_data()
@@ -39,42 +36,49 @@ class OverviewScreen(Screen):
         txn_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
         conn.close()
 
-        # Header
-        self.query_one("#month-header", Label).update(
-            f"\n  {month_display}"
-        )
+        # Panel titles
+        self.query_one("#summary-panel").border_title = month_display
+        self.query_one("#category-panel").border_title = "Categories"
+        recent_count = min(len(recent), 10)
+        self.query_one("#recent-panel").border_title = f"Recent ({recent_count})"
 
         # Summary
-        self.query_one("#summary-line", Label).update(
-            f"  Spending: ${abs(summary['total_spending']):,.2f}"
-            f"    Income: ${summary['total_income']:,.2f}"
-            f"    Net: ${summary['net']:+,.2f}"
+        spending = abs(summary["total_spending"])
+        income = summary["total_income"]
+        net = summary["net"]
+        net_color = "[#22c55e]" if net >= 0 else "[#ef4444]"
+        self.query_one("#summary-content", Static).update(
+            f"[bold]Spending:[/] [#ef4444]${spending:,.2f}[/]"
+            f"    [bold]Income:[/] [#22c55e]${income:,.2f}[/]"
+            f"    [bold]Net:[/] {net_color}${net:+,.2f}[/]"
         )
 
         # Category bars
         if categories:
             total_spend = sum(abs(c["total"]) for c in categories)
-            max_pct = 0
-            cat_data = []
+            max_pct = max((abs(c["total"]) / total_spend * 100) if total_spend else 0 for c in categories)
+
+            lines = []
             for c in categories:
-                pct = (abs(c["total"]) / total_spend * 100) if total_spend else 0
-                cat_data.append((c["category"], c["total"], pct))
-                max_pct = max(max_pct, pct)
-
-            lines = ["\n  Spending by Category\n"]
-            for cat, amt, pct in cat_data:
-                bar_width = 30
+                cat = c["category"]
+                amt = abs(c["total"])
+                pct = (amt / total_spend * 100) if total_spend else 0
+                bar_width = 25
                 filled = int(bar_width * (pct / max_pct)) if max_pct > 0 else 0
-                bar = "\u2588" * filled + "\u2591" * (bar_width - filled)
-                lines.append(f"  {cat:<18} ${abs(amt):>9,.2f}  {bar}  {pct:>5.1f}%")
-            self.query_one("#category-section", Static).update("\n".join(lines))
+                bar_char = "\u2588"
+                empty_char = "\u2591"
+                bar = f"[#2dd4bf]{bar_char * filled}[/][#333]{empty_char * (bar_width - filled)}[/]"
+                lines.append(f"{cat:<18} [bold]${amt:>9,.2f}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
+            self.query_one("#category-content", Static).update("\n".join(lines))
+        else:
+            self.query_one("#category-content", Static).update("[dim]No spending data this month[/]")
 
-        # Recent transactions table
+        # Recent transactions
         table = self.query_one("#recent-table", DataTable)
         table.clear(columns=True)
         table.add_columns("Date", "Description", "Category", "Amount")
         for t in recent:
-            color = "[green]" if t["amount"] > 0 else "[red]"
+            color = "[#22c55e]" if t["amount"] > 0 else "[#ef4444]"
             table.add_row(
                 t["posted"],
                 t["description"][:30],
@@ -83,6 +87,6 @@ class OverviewScreen(Screen):
             )
 
         # Sync status
-        self.query_one("#sync-status", Label).update(
-            f"\n  Last sync: {last_sync or 'never'}  \u2502  {txn_count} transactions"
+        self.query_one("#sync-status", Static).update(
+            f"[dim]Last sync: {last_sync or 'never'}  \u2502  {txn_count} transactions[/]"
         )

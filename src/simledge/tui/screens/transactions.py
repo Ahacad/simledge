@@ -1,9 +1,9 @@
 """Transactions screen — searchable, filterable table."""
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Input, Label
+from textual.widgets import DataTable, Input, Static
 
 from simledge.config import DB_PATH
 from simledge.db import init_db
@@ -18,18 +18,17 @@ class TransactionsScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield NavBar("transactions")
-        with Horizontal(id="filters"):
+        with Vertical(id="txn-panel", classes="panel"):
             yield Input(placeholder="Press / to search...", id="search-input")
-        yield DataTable(id="txn-table")
-        yield Label("", id="txn-status")
+            yield DataTable(id="txn-table")
+            yield Static("", id="txn-status")
 
     def on_mount(self):
+        self.query_one("#txn-panel").border_title = "Transactions"
         self._load_transactions()
-        # Focus table, NOT the search input
         self.query_one("#txn-table", DataTable).focus()
 
     def on_screen_resume(self):
-        # Also focus table when switching back to this screen
         self.query_one("#txn-table", DataTable).focus()
 
     def _load_transactions(self, search=None):
@@ -58,7 +57,7 @@ class TransactionsScreen(Screen):
 
         for r in rows:
             posted, desc, cat, amount, acct_name, pending = r
-            color = "[green]" if amount > 0 else "[red]"
+            color = "[#22c55e]" if amount > 0 else "[#ef4444]"
             pending_mark = " \u23f3" if pending else ""
             table.add_row(
                 posted,
@@ -68,8 +67,8 @@ class TransactionsScreen(Screen):
                 acct_name,
             )
 
-        self.query_one("#txn-status", Label).update(
-            f"  Showing {len(rows)} of {total} transactions"
+        self.query_one("#txn-status", Static).update(
+            f"[dim]Showing {len(rows)} of {total} transactions[/]"
         )
 
     def on_input_changed(self, event: Input.Changed):
