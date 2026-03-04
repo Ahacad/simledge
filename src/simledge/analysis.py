@@ -3,13 +3,13 @@
 from datetime import datetime, timedelta
 
 
-def _account_filter(account_ids, table_prefix=""):
+def _account_filter(account_ids, table_prefix="", column=None):
     """Build WHERE clause fragment and params for account_id filtering."""
     if account_ids is None:
         return "", []
     ids = list(account_ids)
     placeholders = ",".join("?" for _ in ids)
-    col = f"{table_prefix}account_id" if table_prefix else "account_id"
+    col = column or (f"{table_prefix}account_id" if table_prefix else "account_id")
     return f" AND {col} IN ({placeholders})", ids
 
 
@@ -111,7 +111,7 @@ def recent_transactions(conn, limit=20, account_ids=None):
 
 def account_summary(conn, account_ids=None):
     """Return all accounts with latest balance, grouped by institution."""
-    filt, filt_params = _account_filter(account_ids, table_prefix="a.")
+    filt, filt_params = _account_filter(account_ids, column="a.id")
     rows = conn.execute(
         "SELECT a.id, a.name, a.type, a.currency, i.name as institution,"
         " b.balance, b.available_balance, b.date"

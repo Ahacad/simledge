@@ -63,3 +63,52 @@ def test_spending_trend(tmp_path):
     assert "month" in result[0]
     assert "total" in result[0]
     conn.close()
+
+
+def test_monthly_summary_filtered(tmp_path):
+    from simledge.analysis import monthly_summary
+    conn = _seed_db(tmp_path)
+    # Filter to acct-1 only — should exclude the $52.10 gas charge on acct-2
+    result = monthly_summary(conn, "2026-03", account_ids={"acct-1"})
+    assert result["total_spending"] == -47.32 + -23.99  # groceries + shopping
+    assert result["total_income"] == 4225.00
+    conn.close()
+
+
+def test_spending_by_category_filtered(tmp_path):
+    from simledge.analysis import spending_by_category
+    conn = _seed_db(tmp_path)
+    # Filter to acct-2 only — should only have gas
+    result = spending_by_category(conn, "2026-03", account_ids={"acct-2"})
+    assert len(result) == 1
+    assert result[0]["category"] == "gas"
+    assert result[0]["total"] == -52.10
+    conn.close()
+
+
+def test_recent_transactions_filtered(tmp_path):
+    from simledge.analysis import recent_transactions
+    conn = _seed_db(tmp_path)
+    # Filter to acct-1 — should not include acct-2 transactions
+    result = recent_transactions(conn, limit=50, account_ids={"acct-1"})
+    for t in result:
+        assert t["account"] == "Checking"
+    conn.close()
+
+
+def test_net_worth_on_date_filtered(tmp_path):
+    from simledge.analysis import net_worth_on_date
+    conn = _seed_db(tmp_path)
+    # Filter to acct-1 only
+    nw = net_worth_on_date(conn, "2026-03-01", account_ids={"acct-1"})
+    assert nw == 4230.50
+    conn.close()
+
+
+def test_account_summary_filtered(tmp_path):
+    from simledge.analysis import account_summary
+    conn = _seed_db(tmp_path)
+    result = account_summary(conn, account_ids={"acct-2"})
+    assert len(result) == 1
+    assert result[0]["name"] == "Credit Card"
+    conn.close()

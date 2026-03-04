@@ -40,4 +40,7 @@ class NavBar(Static):
             else:
                 parts.append(f"[dim] {key} {label} [/]")
 
-        return "  ".join(parts) + "  [dim]? Help  q Quit[/]"
+        suffix = "  [dim]? Help  a Filter  q Quit[/]"
+        if hasattr(self.app, "active_account_ids") and self.app.active_account_ids is not None:
+            suffix = "  [#2dd4bf][filtered][/]" + suffix
+        return "  ".join(parts) + suffix

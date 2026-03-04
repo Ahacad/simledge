@@ -17,11 +17,16 @@ class AccountsScreen(Screen):
         yield VerticalScroll(id="accounts-scroll")
 
     def on_mount(self):
+        self._refresh_data()
+
+    def _refresh_data(self):
         conn = init_db(DB_PATH)
-        accounts = account_summary(conn)
+        account_ids = self.app.active_account_ids
+        accounts = account_summary(conn, account_ids=account_ids)
         conn.close()
 
         scroll = self.query_one("#accounts-scroll", VerticalScroll)
+        scroll.remove_children()
 
         if not accounts:
             panel = Vertical(Static("[dim]No accounts yet. Run: simledge sync[/]"), classes="panel")

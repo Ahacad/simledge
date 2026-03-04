@@ -165,6 +165,41 @@ RuleModal {
     text-align: center;
 }
 
+/* Account filter modal */
+AccountFilterModal {
+    align: center middle;
+}
+
+#filter-box {
+    width: 55;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#filter-header {
+    height: auto;
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#filter-list {
+    height: auto;
+    max-height: 20;
+}
+
+.filter-group-label {
+    height: 1;
+    margin: 1 0 0 0;
+}
+
+#filter-box Checkbox {
+    height: 1;
+    padding: 0 1;
+}
+
 /* Bills / Recurring screen */
 #bills-panel {
     height: 1fr;
