@@ -80,6 +80,10 @@ class TransactionsScreen(Screen):
         search = self.query_one("#search-input", Input).value.strip()
         self._load_transactions(search=search if search else None)
 
+    def _refresh_data(self):
+        search = self.query_one("#search-input", Input).value.strip()
+        self._load_transactions(search=search if search else None)
+
     def _load_transactions(self, search=None):
         conn = init_db(DB_PATH)
 
@@ -90,6 +94,13 @@ class TransactionsScreen(Screen):
             " WHERE strftime('%Y-%m', t.posted) = ?"
         )
         params = [self._month]
+
+        account_ids = self.app.active_account_ids
+        if account_ids is not None:
+            ids = list(account_ids)
+            placeholders = ",".join("?" for _ in ids)
+            query += f" AND t.account_id IN ({placeholders})"
+            params.extend(ids)
 
         if search:
             query += " AND (t.description LIKE ? OR t.category LIKE ?)"

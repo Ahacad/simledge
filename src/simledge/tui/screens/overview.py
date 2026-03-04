@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
 from textual.widgets import DataTable, Static
@@ -14,6 +15,14 @@ from simledge.tui.widgets.navbar import NavBar
 
 
 class OverviewScreen(Screen):
+    BINDINGS = [
+        Binding("h", "prev_month", "Prev month", show=False),
+        Binding("left", "prev_month", "Prev month", show=False),
+        Binding("l", "next_month", "Next month", show=False),
+        Binding("right", "next_month", "Next month", show=False),
+        Binding("t", "goto_today", "Today", show=False),
+    ]
+
     def compose(self) -> ComposeResult:
         yield NavBar("overview")
         with VerticalScroll():
@@ -22,16 +31,46 @@ class OverviewScreen(Screen):
             yield Vertical(DataTable(id="recent-table"), Static("", id="sync-status"), id="recent-panel", classes="panel")
 
     def on_mount(self):
+        self._month = datetime.now().strftime("%Y-%m")
+        self._refresh_data()
+
+    def action_prev_month(self):
+        y, m = int(self._month[:4]), int(self._month[5:])
+        if m == 1:
+            y, m = y - 1, 12
+        else:
+            m -= 1
+        self._month = f"{y:04d}-{m:02d}"
+        self._refresh_data()
+
+    def action_next_month(self):
+        now = datetime.now().strftime("%Y-%m")
+        if self._month >= now:
+            return
+        y, m = int(self._month[:4]), int(self._month[5:])
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+        new_month = f"{y:04d}-{m:02d}"
+        if new_month > now:
+            return
+        self._month = new_month
+        self._refresh_data()
+
+    def action_goto_today(self):
+        self._month = datetime.now().strftime("%Y-%m")
         self._refresh_data()
 
     def _refresh_data(self):
         conn = init_db(DB_PATH)
-        month = datetime.now().strftime("%Y-%m")
-        month_display = datetime.now().strftime("%B %Y")
+        month = self._month
+        month_display = datetime.strptime(month, "%Y-%m").strftime("%B %Y")
 
-        summary = monthly_summary(conn, month)
-        categories = spending_by_category(conn, month)
-        recent = recent_transactions(conn, limit=10)
+        account_ids = self.app.active_account_ids
+        summary = monthly_summary(conn, month, account_ids=account_ids)
+        categories = spending_by_category(conn, month, account_ids=account_ids)
+        recent = recent_transactions(conn, limit=10, account_ids=account_ids)
         last_sync = get_last_sync(conn)
         txn_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
         conn.close()

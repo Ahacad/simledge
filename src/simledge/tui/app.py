@@ -28,6 +28,10 @@ HELP_TEXT = """\
   [bold]5[/]  Net Worth     [bold]6[/]  Rules
   [bold]7[/]  Bills
 
+[bold]Date Navigation[/]
+  [bold]h/←[/]  Prev month   [bold]l/→[/]  Next month
+  [bold]t[/]  Today          [bold]-/+[/]  Adjust range
+
 [bold]Actions[/]
   [bold]s[/]  Sync from SimpleFIN
   [bold]a[/]  Filter accounts
@@ -55,6 +59,61 @@ class HelpScreen(ModalScreen):
                 yield Static(HELP_TEXT, id="help-box")
 
 
+class AccountFilterModal(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", priority=True),
+        Binding("enter", "apply", "Apply", priority=True),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Middle():
+            with Center():
+                with Vertical(id="filter-box"):
+                    yield Static("[bold]Filter Accounts[/]\n[dim]Space: toggle  Enter: apply  Esc: cancel[/]", id="filter-header")
+                    yield VerticalScroll(id="filter-list")
+
+    def on_mount(self):
+        conn = init_db(DB_PATH)
+        accounts = account_summary(conn)
+        conn.close()
+
+        active = self.app.active_account_ids
+        scroll = self.query_one("#filter-list", VerticalScroll)
+
+        groups = {}
+        for a in accounts:
+            inst = a["institution"] or "Unknown"
+            groups.setdefault(inst, []).append(a)
+
+        for inst, accts in groups.items():
+            scroll.mount(Static(f"[bold #2dd4bf]{inst}[/]", classes="filter-group-label"))
+            for a in accts:
+                bal = a["balance"] or 0
+                color = "#22c55e" if bal >= 0 else "#ef4444"
+                label = f"{a['name']}  [{color}]${bal:,.2f}[/]"
+                checked = active is None or a["id"] in active
+                cb = Checkbox(label, value=checked, id=f"filter-{a['id']}")
+                cb._account_id = a["id"]
+                scroll.mount(cb)
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+    def action_apply(self):
+        checkboxes = self.query(Checkbox)
+        selected = set()
+        total = 0
+        for cb in checkboxes:
+            total += 1
+            if cb.value:
+                selected.add(cb._account_id)
+
+        if len(selected) == total:
+            self.dismiss("all")
+        else:
+            self.dismiss(selected)
+
+
 class SimpLedgeApp(App):
     CSS_PATH = "app.tcss"
     TITLE = "SimpLedge"
@@ -69,6 +128,7 @@ class SimpLedgeApp(App):
         Binding("6", "switch_mode('rules')", "Rules", priority=True, show=False),
         Binding("7", "switch_mode('recurring')", "Bills", priority=True, show=False),
         Binding("s", "sync", "Sync", priority=True, show=False),
+        Binding("a", "show_filter", "Filter", priority=True, show=False),
         Binding("question_mark", "show_help", "? Help", priority=True, show=False),
         Binding("q", "quit", "Quit", priority=True, show=False),
     ]
@@ -83,11 +143,29 @@ class SimpLedgeApp(App):
         "recurring": RecurringScreen,
     }
 
+    def __init__(self):
+        super().__init__()
+        self.active_account_ids = None  # None = all accounts
+
     def on_mount(self):
         self.switch_mode("overview")
 
     def action_show_help(self):
         self.push_screen(HelpScreen())
+
+    def action_show_filter(self):
+        self.push_screen(AccountFilterModal(), callback=self._on_filter_dismiss)
+
+    def _on_filter_dismiss(self, result):
+        if result is None:
+            return  # cancelled
+        if result == "all":
+            self.active_account_ids = None
+        else:
+            self.active_account_ids = result
+        screen = self.screen
+        if hasattr(screen, "_refresh_data"):
+            screen._refresh_data()
 
     async def _do_sync(self):
         result = await run_sync(quiet=True)
