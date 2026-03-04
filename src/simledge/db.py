@@ -122,7 +122,8 @@ def upsert_institution(conn, id, name, domain=None):
 def upsert_account(conn, id, institution_id, name, currency="USD", type=None):
     conn.execute(
         "INSERT INTO accounts (id, institution_id, name, currency, type) VALUES (?, ?, ?, ?, ?)"
-        " ON CONFLICT(id) DO UPDATE SET name=excluded.name, currency=excluded.currency, type=excluded.type",
+        " ON CONFLICT(id) DO UPDATE SET name=excluded.name, currency=excluded.currency,"
+        " type=COALESCE(excluded.type, accounts.type)",
         (id, institution_id, name, currency, type),
     )
     conn.commit()

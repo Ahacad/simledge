@@ -15,6 +15,21 @@ from simledge.log import setup_logging
 
 log = setup_logging("simledge.sync")
 
+CC_NAME_HINTS = {"credit", "card", "visa", "mastercard", "amex", "discover", "citi"}
+
+
+def _infer_account_type(name):
+    """Best-effort account type from name keywords."""
+    lower = name.lower()
+    for hint in CC_NAME_HINTS:
+        if hint in lower:
+            return "credit"
+    if "checking" in lower:
+        return "checking"
+    if "saving" in lower:
+        return "savings"
+    return None
+
 
 def parse_response(data):
     """Parse SimpleFIN JSON response into normalized records."""
@@ -43,6 +58,7 @@ def parse_response(data):
             "institution_id": institution_id,
             "name": acct["name"],
             "currency": acct.get("currency", "USD"),
+            "type": _infer_account_type(acct["name"]),
         })
 
         balance_ts = acct.get("balance-date", 0)
@@ -135,7 +151,7 @@ async def run_sync(full=False, start_date=None, quiet=False):
     for inst in institutions:
         upsert_institution(conn, inst["id"], inst["name"], inst.get("domain"))
     for acct in accounts:
-        upsert_account(conn, acct["id"], acct["institution_id"], acct["name"], acct["currency"])
+        upsert_account(conn, acct["id"], acct["institution_id"], acct["name"], acct["currency"], acct.get("type"))
     for bal in balances:
         snapshot_balance(conn, bal["account_id"], bal["date"], bal["balance"], bal.get("available_balance"))
 

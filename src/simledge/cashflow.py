@@ -45,6 +45,7 @@ def project_balances(conn, days=90, account_ids=None):
         by_date_account[occ["date"]][occ["account"]] += occ["amount"]
 
     # Build daily running balances per account
+    cc_accounts = {a["name"] for a in accounts if a.get("type") in ("credit", "credit_card")}
     balances = {name: info["balance"] for name, info in acct_map.items()}
     per_account_daily = {name: [] for name in acct_map}
     daily_totals = []
@@ -65,7 +66,7 @@ def project_balances(conn, days=90, account_ids=None):
             bal = balances[name]
             per_account_daily[name].append({"date": d_str, "balance": bal})
             # Track first negative date per account
-            if bal < 0 and name not in negative_dates:
+            if bal < 0 and name not in negative_dates and name not in cc_accounts:
                 negative_dates[name] = {"date": d_str, "account": name, "balance": bal}
 
         # Record total

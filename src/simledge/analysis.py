@@ -3,6 +3,9 @@
 from datetime import datetime, timedelta
 
 
+_EXCLUDE_CC = " AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
+
+
 def _account_filter(account_ids, table_prefix="", column=None):
     """Build WHERE clause fragment and params for account_id filtering."""
     if account_ids is None:
@@ -29,12 +32,16 @@ def spending_by_category(conn, month, account_ids=None):
 
 def monthly_summary(conn, month, account_ids=None):
     """Return total spending, income, and net for a month."""
-    filt, filt_params = _account_filter(account_ids)
+    filt, filt_params = _account_filter(account_ids, table_prefix="t.")
     row = conn.execute(
         "SELECT"
-        " COALESCE(SUM(CASE WHEN amount < 0 THEN amount END), 0),"
-        " COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0)"
-        " FROM transactions WHERE strftime('%Y-%m', posted) = ?"
+        " COALESCE(SUM(CASE WHEN t.amount < 0 THEN t.amount END), 0),"
+        " COALESCE(SUM(CASE WHEN t.amount > 0"
+        "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
+        "   THEN t.amount END), 0)"
+        " FROM transactions t"
+        " JOIN accounts a ON t.account_id = a.id"
+        " WHERE strftime('%Y-%m', t.posted) = ?"
         + filt,
         [month] + filt_params,
     ).fetchone()
@@ -92,11 +99,13 @@ def spending_trend(conn, months=6, account_ids=None):
 
 def income_by_category(conn, month, account_ids=None):
     """Return income grouped by category for a YYYY-MM month."""
-    filt, filt_params = _account_filter(account_ids)
+    filt, filt_params = _account_filter(account_ids, table_prefix="t.")
     rows = conn.execute(
-        "SELECT COALESCE(category, 'uncategorized') as cat, SUM(amount) as total"
-        " FROM transactions"
-        " WHERE strftime('%Y-%m', posted) = ? AND amount > 0"
+        "SELECT COALESCE(t.category, 'uncategorized') as cat, SUM(t.amount) as total"
+        " FROM transactions t"
+        " JOIN accounts a ON t.account_id = a.id"
+        " WHERE strftime('%Y-%m', t.posted) = ? AND t.amount > 0"
+        + _EXCLUDE_CC
         + filt
         + " GROUP BY cat ORDER BY total DESC",
         [month] + filt_params,
@@ -110,10 +119,13 @@ def income_trend(conn, months=6, account_ids=None):
     start = today - timedelta(days=months * 31)
     start_str = start.strftime("%Y-%m-%d")
 
-    filt, filt_params = _account_filter(account_ids)
+    filt, filt_params = _account_filter(account_ids, table_prefix="t.")
     rows = conn.execute(
-        "SELECT strftime('%Y-%m', posted) as month, SUM(amount) as total"
-        " FROM transactions WHERE amount > 0 AND posted >= ?"
+        "SELECT strftime('%Y-%m', t.posted) as month, SUM(t.amount) as total"
+        " FROM transactions t"
+        " JOIN accounts a ON t.account_id = a.id"
+        " WHERE t.amount > 0 AND t.posted >= ?"
+        + _EXCLUDE_CC
         + filt
         + " GROUP BY month ORDER BY month",
         [start_str] + filt_params,
@@ -238,16 +250,19 @@ def ytd_comparison(conn, account_ids=None):
     previous_year = str(now.year - 1)
     current_month_num = f"{now.month:02d}"
 
-    filt, filt_params = _account_filter(account_ids)
+    filt, filt_params = _account_filter(account_ids, table_prefix="t.")
 
     def _ytd_totals(year):
         row = conn.execute(
             "SELECT"
-            " COALESCE(SUM(CASE WHEN amount < 0 THEN amount END), 0),"
-            " COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0)"
-            " FROM transactions"
-            " WHERE strftime('%Y', posted) = ?"
-            " AND strftime('%m', posted) <= ?"
+            " COALESCE(SUM(CASE WHEN t.amount < 0 THEN t.amount END), 0),"
+            " COALESCE(SUM(CASE WHEN t.amount > 0"
+            "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
+            "   THEN t.amount END), 0)"
+            " FROM transactions t"
+            " JOIN accounts a ON t.account_id = a.id"
+            " WHERE strftime('%Y', t.posted) = ?"
+            " AND strftime('%m', t.posted) <= ?"
             + filt,
             [year, current_month_num] + filt_params,
         ).fetchone()

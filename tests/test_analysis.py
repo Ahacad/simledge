@@ -178,6 +178,43 @@ def test_spending_by_category_grouped_empty(tmp_path):
 
 # --- Income Report tests ---
 
+def test_income_excludes_credit_card(tmp_path):
+    """Credit card positive transactions should not count as income."""
+    from simledge.analysis import income_by_category, monthly_summary, income_trend
+    conn = _seed_db(tmp_path)
+    # Add a CC payment (positive on CC account = balance reduction, NOT income)
+    upsert_transaction(conn, "t-cc-pay", "acct-2", "2026-03-05", 500.00, "PAYMENT THANK YOU")
+
+    # income_by_category should NOT include the CC payment
+    inc = income_by_category(conn, "2026-03")
+    total_inc = sum(c["total"] for c in inc)
+    assert total_inc == 4225.00  # only PAYROLL, not the 500 CC payment
+
+    # monthly_summary income should exclude CC
+    summary = monthly_summary(conn, "2026-03")
+    assert summary["total_income"] == 4225.00
+
+    # income_trend should exclude CC
+    trend = income_trend(conn, months=2)
+    mar = [r for r in trend if r["month"] == "2026-03"]
+    assert mar[0]["total"] == 4225.00
+    conn.close()
+
+
+def test_income_includes_null_type_accounts(tmp_path):
+    """Accounts with no type set should still count toward income."""
+    from simledge.analysis import income_by_category
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Test Bank")
+    # Account with type=None (unknown)
+    upsert_account(conn, "acct-x", "org-1", "Mystery Account", "USD", None)
+    upsert_transaction(conn, "t-x1", "acct-x", "2026-03-01", 1000.00, "DEPOSIT")
+    result = income_by_category(conn, "2026-03")
+    assert len(result) == 1
+    assert result[0]["total"] == 1000.00
+    conn.close()
+
+
 def test_income_by_category(tmp_path):
     from simledge.analysis import income_by_category
     conn = _seed_db(tmp_path)

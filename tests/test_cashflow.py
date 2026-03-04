@@ -117,6 +117,24 @@ def test_negative_balance_detection(tmp_path):
     conn.close()
 
 
+def test_negative_balance_ignores_credit_cards(tmp_path):
+    """Credit card accounts should not trigger negative balance warnings."""
+    db_path = str(tmp_path / "test.db")
+    conn = init_db(db_path)
+    upsert_institution(conn, "bank-1", "Test Bank")
+    upsert_account(conn, "acct-1", "bank-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cc", "bank-1", "Visa Card", "USD", "credit")
+
+    snapshot_balance(conn, "acct-1", date.today().strftime("%Y-%m-%d"), 5000.00)
+    snapshot_balance(conn, "acct-cc", date.today().strftime("%Y-%m-%d"), -2000.00)
+
+    result = project_balances(conn, days=30)
+    # CC account is negative but should NOT appear in warnings
+    for neg in result["negative_dates"]:
+        assert neg["account"] != "Visa Card"
+    conn.close()
+
+
 def test_project_balances_no_recurring(tmp_path):
     conn = _setup_db(tmp_path)
     snapshot_balance(conn, "acct-1", date.today().strftime("%Y-%m-%d"), 5000.00)
