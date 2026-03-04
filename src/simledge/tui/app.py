@@ -35,8 +35,9 @@ HELP_TEXT = """\
 [bold]Actions[/]
   [bold]s[/]  Sync from SimpleFIN
   [bold]a[/]  Filter accounts
-  [bold]/[/]  Search (Transactions screen)
-  [bold]Esc[/]  Clear search / close help
+  [bold]/[/]  Quick search (Transactions)
+  [bold]f[/]  Advanced filters (Transactions)
+  [bold]Esc[/]  Clear filters / close help
   [bold]?[/]  Show this help
   [bold]q[/]  Quit
 

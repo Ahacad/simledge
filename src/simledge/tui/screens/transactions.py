@@ -4,21 +4,101 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
-from textual.screen import Screen
-from textual.widgets import DataTable, Input, Static
+from textual.containers import Center, Middle, Vertical
+from textual.screen import ModalScreen, Screen
+from textual.widgets import Checkbox, DataTable, Input, Static
 
 from simledge.config import DB_PATH
 from simledge.db import init_db, get_transaction
+from simledge.tags import get_transaction_tags
 from simledge.tui.screens.transaction_detail import TransactionDetailScreen
 from simledge.tui.widgets.navbar import NavBar
+
+
+class FilterModal(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", priority=True),
+        Binding("c", "clear_all", "Clear all", priority=True),
+    ]
+
+    def __init__(self, current_filters=None):
+        super().__init__()
+        self._current = current_filters or {}
+
+    def compose(self) -> ComposeResult:
+        f = self._current
+        with Middle():
+            with Center():
+                with Vertical(id="filter-modal-box"):
+                    yield Static("[bold]Filters[/]", id="filter-modal-title")
+                    yield Static("[dim]Description[/]", classes="field-label")
+                    yield Input(
+                        value=f.get("description", ""),
+                        placeholder="Filter by description...",
+                        id="filter-description",
+                    )
+                    yield Static("[dim]Category[/]", classes="field-label")
+                    yield Input(
+                        value=f.get("category", ""),
+                        placeholder="Filter by category...",
+                        id="filter-category",
+                    )
+                    yield Static("[dim]Min amount[/]", classes="field-label")
+                    yield Input(
+                        value=f.get("min_amount", ""),
+                        placeholder="e.g. 50",
+                        id="filter-min-amount",
+                    )
+                    yield Static("[dim]Max amount[/]", classes="field-label")
+                    yield Input(
+                        value=f.get("max_amount", ""),
+                        placeholder="e.g. 500",
+                        id="filter-max-amount",
+                    )
+                    yield Checkbox(
+                        "Pending only",
+                        value=f.get("pending_only", False),
+                        id="filter-pending",
+                    )
+                    yield Static(
+                        "[dim]Enter[/] apply  [dim]Esc[/] cancel  [dim]c[/] clear all",
+                        id="filter-modal-hint",
+                    )
+
+    def on_input_submitted(self, event: Input.Submitted):
+        self._apply()
+
+    def _apply(self):
+        filters = {}
+        desc = self.query_one("#filter-description", Input).value.strip()
+        if desc:
+            filters["description"] = desc
+        cat = self.query_one("#filter-category", Input).value.strip()
+        if cat:
+            filters["category"] = cat
+        min_amt = self.query_one("#filter-min-amount", Input).value.strip()
+        if min_amt:
+            filters["min_amount"] = min_amt
+        max_amt = self.query_one("#filter-max-amount", Input).value.strip()
+        if max_amt:
+            filters["max_amount"] = max_amt
+        if self.query_one("#filter-pending", Checkbox).value:
+            filters["pending_only"] = True
+        self.dismiss(filters)
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+    def action_clear_all(self):
+        self.dismiss({})
 
 
 class TransactionsScreen(Screen):
     BINDINGS = [
         ("slash", "focus_search", "/ Search"),
-        ("escape", "blur_search", "Esc Back"),
+        ("escape", "clear_or_blur", "Esc Back"),
         ("enter", "open_detail", "Enter Detail"),
+        Binding("f", "open_filters", "f Filters", show=False),
         Binding("h", "prev_month", "Prev month", show=False),
         Binding("left", "prev_month", "Prev month", show=False),
         Binding("l", "next_month", "Next month", show=False),
@@ -29,12 +109,13 @@ class TransactionsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield NavBar("transactions")
         with Vertical(id="txn-panel", classes="panel"):
-            yield Input(placeholder="Press / to search...", id="search-input")
+            yield Input(placeholder="Press / to search, f for filters...", id="search-input")
             yield DataTable(id="txn-table")
             yield Static("", id="txn-status")
 
     def on_mount(self):
         self._month = datetime.now().strftime("%Y-%m")
+        self._filters = {}
         self._update_title()
         self._load_transactions()
         self.query_one("#txn-table", DataTable).focus()
@@ -54,8 +135,7 @@ class TransactionsScreen(Screen):
             m -= 1
         self._month = f"{y:04d}-{m:02d}"
         self._update_title()
-        search = self.query_one("#search-input", Input).value.strip()
-        self._load_transactions(search=search if search else None)
+        self._reload()
 
     def action_next_month(self):
         now = datetime.now().strftime("%Y-%m")
@@ -71,16 +151,17 @@ class TransactionsScreen(Screen):
             return
         self._month = new_month
         self._update_title()
-        search = self.query_one("#search-input", Input).value.strip()
-        self._load_transactions(search=search if search else None)
+        self._reload()
 
     def action_goto_today(self):
         self._month = datetime.now().strftime("%Y-%m")
         self._update_title()
-        search = self.query_one("#search-input", Input).value.strip()
-        self._load_transactions(search=search if search else None)
+        self._reload()
 
     def _refresh_data(self):
+        self._reload()
+
+    def _reload(self):
         search = self.query_one("#search-input", Input).value.strip()
         self._load_transactions(search=search if search else None)
 
@@ -105,6 +186,31 @@ class TransactionsScreen(Screen):
         if search:
             query += " AND (t.description LIKE ? OR t.category LIKE ?)"
             params.extend([f"%{search}%", f"%{search}%"])
+
+        # Advanced filters
+        f = self._filters
+        if f.get("description"):
+            query += " AND t.description LIKE ?"
+            params.append(f"%{f['description']}%")
+        if f.get("category"):
+            query += " AND t.category LIKE ?"
+            params.append(f"%{f['category']}%")
+        if f.get("min_amount"):
+            try:
+                val = float(f["min_amount"])
+                query += " AND ABS(t.amount) >= ?"
+                params.append(val)
+            except ValueError:
+                pass
+        if f.get("max_amount"):
+            try:
+                val = float(f["max_amount"])
+                query += " AND ABS(t.amount) <= ?"
+                params.append(val)
+            except ValueError:
+                pass
+        if f.get("pending_only"):
+            query += " AND t.pending = 1"
 
         query += " ORDER BY t.posted DESC, t.id DESC LIMIT 500"
 
@@ -132,9 +238,23 @@ class TransactionsScreen(Screen):
                 key=txn_id,
             )
 
-        self.query_one("#txn-status", Static).update(
-            f"[dim]Showing {len(rows)} of {total} transactions[/]"
-        )
+        status = f"[dim]Showing {len(rows)} of {total} transactions"
+        filter_count = len(self._filters)
+        if filter_count:
+            tags = []
+            if "description" in self._filters:
+                tags.append(f"desc: {self._filters['description']}")
+            if "category" in self._filters:
+                tags.append(f"cat: {self._filters['category']}")
+            if "min_amount" in self._filters:
+                tags.append(f"min: ${self._filters['min_amount']}")
+            if "max_amount" in self._filters:
+                tags.append(f"max: ${self._filters['max_amount']}")
+            if self._filters.get("pending_only"):
+                tags.append("pending")
+            status += f" [{'] ['.join(tags)}]"
+        status += "[/]"
+        self.query_one("#txn-status", Static).update(status)
 
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "search-input":
@@ -144,11 +264,29 @@ class TransactionsScreen(Screen):
     def action_focus_search(self):
         self.query_one("#search-input", Input).focus()
 
-    def action_blur_search(self):
+    def action_clear_or_blur(self):
         search_input = self.query_one("#search-input", Input)
-        search_input.value = ""
-        self.query_one("#txn-table", DataTable).focus()
-        self._load_transactions()
+        if search_input.has_focus and search_input.value:
+            search_input.value = ""
+            self.query_one("#txn-table", DataTable).focus()
+            self._load_transactions()
+        elif self._filters:
+            self._filters = {}
+            self.query_one("#txn-table", DataTable).focus()
+            self._reload()
+        else:
+            search_input.value = ""
+            self.query_one("#txn-table", DataTable).focus()
+            self._load_transactions()
+
+    def action_open_filters(self):
+        self.app.push_screen(FilterModal(self._filters), self._on_filter_dismiss)
+
+    def _on_filter_dismiss(self, result):
+        if result is None:
+            return
+        self._filters = result
+        self._reload()
 
     def action_open_detail(self):
         table = self.query_one("#txn-table", DataTable)
@@ -164,7 +302,6 @@ class TransactionsScreen(Screen):
 
         def on_dismiss(changed):
             if changed:
-                search = self.query_one("#search-input", Input).value.strip()
-                self._load_transactions(search=search if search else None)
+                self._reload()
 
         self.app.push_screen(TransactionDetailScreen(txn), on_dismiss)
