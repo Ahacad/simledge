@@ -55,6 +55,34 @@ CREATE TABLE IF NOT EXISTS sync_log (
     transactions_added INTEGER,
     status TEXT
 );
+
+CREATE TABLE IF NOT EXISTS budgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL UNIQUE,
+    monthly_limit REAL NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS transaction_tags (
+    transaction_id TEXT REFERENCES transactions(id),
+    tag_id INTEGER REFERENCES tags(id),
+    PRIMARY KEY (transaction_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    target_amount REAL NOT NULL,
+    target_date TEXT,
+    account_id TEXT REFERENCES accounts(id),
+    starting_balance REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 

@@ -174,3 +174,55 @@ def test_spending_by_category_grouped_empty(tmp_path):
     result = spending_by_category_grouped(conn, "2026-03")
     assert result == []
     conn.close()
+
+
+# --- Income Report tests ---
+
+def test_income_by_category(tmp_path):
+    from simledge.analysis import income_by_category
+    conn = _seed_db(tmp_path)
+    result = income_by_category(conn, "2026-03")
+    assert len(result) == 1
+    assert result[0]["category"] == "income"
+    assert result[0]["total"] == 4225.00
+    conn.close()
+
+
+def test_income_by_category_empty(tmp_path):
+    from simledge.analysis import income_by_category
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    result = income_by_category(conn, "2026-03")
+    assert result == []
+    conn.close()
+
+
+def test_income_trend(tmp_path):
+    from simledge.analysis import income_trend
+    conn = _seed_db(tmp_path)
+    # Add income in February too
+    upsert_transaction(conn, "t7", "acct-1", "2026-02-01", 4100.00, "PAYROLL", category="income")
+    result = income_trend(conn, months=2)
+    assert len(result) >= 2
+    assert "month" in result[0]
+    assert "total" in result[0]
+    # Feb income should be 4100, March should be 4225
+    feb = [r for r in result if r["month"] == "2026-02"]
+    mar = [r for r in result if r["month"] == "2026-03"]
+    assert len(feb) == 1 and feb[0]["total"] == 4100.00
+    assert len(mar) == 1 and mar[0]["total"] == 4225.00
+    conn.close()
+
+
+def test_income_by_category_filtered(tmp_path):
+    from simledge.analysis import income_by_category
+    conn = _seed_db(tmp_path)
+    # acct-2 has no income — filter to it
+    result = income_by_category(conn, "2026-03", account_ids={"acct-2"})
+    assert result == []
+    # acct-1 has the payroll
+    result = income_by_category(conn, "2026-03", account_ids={"acct-1"})
+    assert len(result) == 1
+    assert result[0]["total"] == 4225.00
+    conn.close()

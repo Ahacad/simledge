@@ -43,6 +43,12 @@ class FilterModal(ModalScreen):
                         placeholder="Filter by category...",
                         id="filter-category",
                     )
+                    yield Static("[dim]Tag[/]", classes="field-label")
+                    yield Input(
+                        value=f.get("tag", ""),
+                        placeholder="Filter by tag...",
+                        id="filter-tag",
+                    )
                     yield Static("[dim]Min amount[/]", classes="field-label")
                     yield Input(
                         value=f.get("min_amount", ""),
@@ -76,6 +82,9 @@ class FilterModal(ModalScreen):
         cat = self.query_one("#filter-category", Input).value.strip()
         if cat:
             filters["category"] = cat
+        tag = self.query_one("#filter-tag", Input).value.strip()
+        if tag:
+            filters["tag"] = tag
         min_amt = self.query_one("#filter-min-amount", Input).value.strip()
         if min_amt:
             filters["min_amount"] = min_amt
@@ -93,12 +102,43 @@ class FilterModal(ModalScreen):
         self.dismiss({})
 
 
+class TagFilterModal(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", priority=True),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Middle():
+            with Center():
+                with Vertical(id="tag-filter-box"):
+                    yield Static("[bold]Filter by Tag[/]", id="tag-filter-title")
+                    yield Input(
+                        placeholder="Enter tag name...",
+                        id="tag-filter-input",
+                    )
+                    yield Static(
+                        "[dim]Enter[/] apply  [dim]Esc[/] cancel",
+                        id="tag-filter-hint",
+                    )
+
+    def on_mount(self):
+        self.query_one("#tag-filter-input", Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted):
+        value = self.query_one("#tag-filter-input", Input).value.strip()
+        self.dismiss(value)
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+
 class TransactionsScreen(Screen):
     BINDINGS = [
         ("slash", "focus_search", "/ Search"),
         ("escape", "clear_or_blur", "Esc Back"),
         ("enter", "open_detail", "Enter Detail"),
         Binding("f", "open_filters", "f Filters", show=False),
+        Binding("g", "filter_tag", "g Tag filter", show=False),
         Binding("h", "prev_month", "Prev month", show=False),
         Binding("left", "prev_month", "Prev month", show=False),
         Binding("l", "next_month", "Next month", show=False),
@@ -211,6 +251,12 @@ class TransactionsScreen(Screen):
                 pass
         if f.get("pending_only"):
             query += " AND t.pending = 1"
+        if f.get("tag"):
+            query += (
+                " AND t.id IN (SELECT transaction_id FROM transaction_tags tt"
+                " JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = ?)"
+            )
+            params.append(f["tag"].strip().lower())
 
         query += " ORDER BY t.posted DESC, t.id DESC LIMIT 500"
 
@@ -252,6 +298,8 @@ class TransactionsScreen(Screen):
                 tags.append(f"max: ${self._filters['max_amount']}")
             if self._filters.get("pending_only"):
                 tags.append("pending")
+            if "tag" in self._filters:
+                tags.append(f"tag: {self._filters['tag']}")
             status += f" [{'] ['.join(tags)}]"
         status += "[/]"
         self.query_one("#txn-status", Static).update(status)
@@ -288,6 +336,22 @@ class TransactionsScreen(Screen):
         self._filters = result
         self._reload()
 
+    def action_filter_tag(self):
+        if self._filters.get("tag"):
+            del self._filters["tag"]
+            self._reload()
+            return
+        self.app.push_screen(TagFilterModal(), self._on_tag_filter_dismiss)
+
+    def _on_tag_filter_dismiss(self, result):
+        if result is None:
+            return
+        if result:
+            self._filters["tag"] = result
+        elif "tag" in self._filters:
+            del self._filters["tag"]
+        self._reload()
+
     def action_open_detail(self):
         table = self.query_one("#txn-table", DataTable)
         if table.cursor_row is None or table.row_count == 0:
@@ -296,6 +360,7 @@ class TransactionsScreen(Screen):
         txn_id = str(row_key)
         conn = init_db(DB_PATH)
         txn = get_transaction(conn, txn_id)
+        tags = get_transaction_tags(conn, txn_id)
         conn.close()
         if not txn:
             return
@@ -304,4 +369,4 @@ class TransactionsScreen(Screen):
             if changed:
                 self._reload()
 
-        self.app.push_screen(TransactionDetailScreen(txn), on_dismiss)
+        self.app.push_screen(TransactionDetailScreen(txn, tags=tags), on_dismiss)

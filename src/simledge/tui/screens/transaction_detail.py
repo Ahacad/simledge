@@ -8,6 +8,7 @@ from textual.widgets import Input, Static
 
 from simledge.config import DB_PATH
 from simledge.db import init_db, update_transaction_field
+from simledge.tags import get_transaction_tags, set_transaction_tags
 
 
 class TransactionDetailScreen(ModalScreen):
@@ -15,9 +16,10 @@ class TransactionDetailScreen(ModalScreen):
         Binding("escape", "cancel", "Cancel", priority=True),
     ]
 
-    def __init__(self, txn):
+    def __init__(self, txn, tags=None):
         super().__init__()
         self.txn = txn
+        self._tags = tags or []
 
     def compose(self) -> ComposeResult:
         t = self.txn
@@ -47,6 +49,12 @@ class TransactionDetailScreen(ModalScreen):
                         placeholder="Enter notes...",
                         id="txn-notes",
                     )
+                    yield Static("[dim]Tags[/]", classes="field-label")
+                    yield Input(
+                        value=", ".join(self._tags),
+                        placeholder="Comma-separated tags...",
+                        id="txn-tags",
+                    )
                     yield Static(
                         "[dim]Enter[/] save  [dim]Esc[/] cancel",
                         id="txn-detail-hint",
@@ -58,9 +66,12 @@ class TransactionDetailScreen(ModalScreen):
     def _save_and_dismiss(self):
         category = self.query_one("#txn-category", Input).value.strip()
         notes = self.query_one("#txn-notes", Input).value.strip()
+        tags_raw = self.query_one("#txn-tags", Input).value
+        tag_names = [t.strip() for t in tags_raw.split(",") if t.strip()]
         conn = init_db(DB_PATH)
         update_transaction_field(conn, self.txn["id"], "category", category or None)
         update_transaction_field(conn, self.txn["id"], "notes", notes or None)
+        set_transaction_tags(conn, self.txn["id"], tag_names)
         conn.close()
         self.dismiss(True)
 
