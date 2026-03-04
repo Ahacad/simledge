@@ -27,6 +27,7 @@ def main():
 
     rule_p = sub.add_parser("rule", help="manage category rules")
     rule_sub = rule_p.add_subparsers(dest="rule_command")
+    rule_sub.add_parser("init", help="generate default rules.toml")
     add_p = rule_sub.add_parser("add", help="add a category rule")
     add_p.add_argument("pattern", help="regex or keyword to match")
     add_p.add_argument("category", help="category to assign")
@@ -163,30 +164,46 @@ def _run_export(args):
 
 
 def _run_rule(args):
-    from simledge.categorize import add_rule, apply_rules, list_rules
-    from simledge.db import init_db
+    from simledge.categorize import apply_rules, init_rules, load_rules, save_rules
+    from simledge.config import RULES_PATH
 
-    conn = init_db(DB_PATH)
-
-    if args.rule_command == "add":
-        add_rule(conn, args.pattern, args.category, args.priority)
-        print(f"Rule added: '{args.pattern}' → {args.category}")
-    elif args.rule_command == "list":
-        rules = list_rules(conn)
-        if not rules:
-            print("No rules configured. Add one: simledge rule add 'PATTERN' category")
+    if args.rule_command == "init":
+        created = init_rules(RULES_PATH)
+        if created:
+            print(f"Default rules written to {RULES_PATH}")
         else:
-            print(f"{'ID':>4}  {'Priority':>8}  {'Pattern':<30}  Category")
-            print("-" * 70)
-            for r in rules:
-                print(f"{r['id']:>4}  {r['priority']:>8}  {r['pattern']:<30}  {r['category']}")
+            print(f"Rules file already exists at {RULES_PATH}")
+    elif args.rule_command == "add":
+        rules = load_rules(RULES_PATH)
+        rules.append(
+            {
+                "pattern": args.pattern,
+                "category": args.category,
+                "priority": args.priority,
+            }
+        )
+        save_rules(RULES_PATH, rules)
+        print(f"Rule added: '{args.pattern}' -> {args.category}")
+    elif args.rule_command == "list":
+        rules = load_rules(RULES_PATH)
+        if not rules:
+            print("No rules configured. Run: simledge rule init")
+        else:
+            print(f"{'#':>4}  {'Priority':>8}  {'Pattern':<40}  Category")
+            print("-" * 90)
+            for i, r in enumerate(rules, 1):
+                print(f"{i:>4}  {r['priority']:>8}  {r['pattern']:<40}  {r['category']}")
+            print(f"\nSource: {RULES_PATH}")
     elif args.rule_command == "test":
-        count = apply_rules(conn, dry_run=True)
+        from simledge.db import init_db
+
+        rules = load_rules(RULES_PATH)
+        conn = init_db(DB_PATH)
+        count = apply_rules(rules, conn, dry_run=True)
+        conn.close()
         print(f"Would categorize {count} transactions.")
     else:
-        print("Usage: simledge rule {add,list,test}")
-
-    conn.close()
+        print("Usage: simledge rule {init,add,list,test}")
 
 
 if __name__ == "__main__":
