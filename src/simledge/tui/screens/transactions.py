@@ -11,6 +11,7 @@ from textual.widgets import Checkbox, DataTable, Input, Static
 from simledge.config import DB_PATH
 from simledge.db import init_db, get_transaction
 from simledge.tags import get_transaction_tags
+from simledge.tui.formatting import format_dollar
 from simledge.tui.screens.transaction_detail import TransactionDetailScreen
 from simledge.tui.widgets.navbar import NavBar
 
@@ -271,6 +272,7 @@ class TransactionsScreen(Screen):
         table.clear(columns=True)
         table.add_columns("Date", "Description", "Category", "Amount", "Account")
 
+        m = self.app.privacy_mode
         for r in rows:
             txn_id, posted, desc, cat, amount, acct_name, pending = r
             color = "[#22c55e]" if amount > 0 else "[#ef4444]"
@@ -279,7 +281,7 @@ class TransactionsScreen(Screen):
                 posted,
                 (desc or "")[:35],
                 cat,
-                f"{color}${amount:+,.2f}[/]{pending_mark}",
+                f"{color}{format_dollar(amount, signed=True, masked=m)}[/]{pending_mark}",
                 acct_name,
                 key=txn_id,
             )

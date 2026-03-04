@@ -12,6 +12,7 @@ from simledge.goals import (
     create_goal, get_goals, update_goal, delete_goal, all_goals_progress,
 )
 from simledge.analysis import account_summary
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -136,6 +137,7 @@ class GoalsScreen(Screen):
         self._refresh_data()
 
     def _refresh_data(self):
+        m = self.app.privacy_mode
         conn = init_db(DB_PATH)
         progress = all_goals_progress(conn)
         conn.close()
@@ -162,7 +164,7 @@ class GoalsScreen(Screen):
             prefix = "[bold #2dd4bf]>[/] " if i == self._selected_idx else "  "
             lines.append(
                 f"{prefix}[bold]{g['name']}[/]"
-                f"     [#2dd4bf]${current:,.2f}[/] / ${target:,.2f}"
+                f"     [#2dd4bf]{format_dollar(current, masked=m)}[/] / {format_dollar(target, masked=m)}"
             )
             lines.append(f"  {bar}  {pct:.0f}%")
 
@@ -170,7 +172,7 @@ class GoalsScreen(Screen):
                 td = g["target_date"]
                 month_label = td[:7] if td else ""
                 lines.append(
-                    f"  [dim]Need ${g['monthly_needed']:,.2f}/mo to hit {month_label}[/]"
+                    f"  [dim]Need {format_dollar(g['monthly_needed'], masked=m)}/mo to hit {month_label}[/]"
                 )
             elif not g["linked"]:
                 lines.append("  [dim]Link an account to track progress[/]")

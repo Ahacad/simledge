@@ -12,6 +12,7 @@ from simledge.analysis import spending_trend, spending_by_category_grouped, inco
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.charts import render_bar_chart, TEAL, GREEN
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -50,6 +51,7 @@ class TrendsScreen(Screen):
         self._refresh_data()
 
     def _refresh_data(self):
+        m = self.app.privacy_mode
         conn = init_db(DB_PATH)
         account_ids = self.app.active_account_ids
         trend = spending_trend(conn, months=self._lookback, account_ids=account_ids)
@@ -96,10 +98,10 @@ class TrendsScreen(Screen):
                     arrow = "▲" if change > 0 else "▼"
                     color = "#ef4444" if change > 0 else "#22c55e"
                     lines.append(
-                        f"{cat:<18} [bold]${abs(prev):>9,.2f}[/] → [bold]${abs(cur):>9,.2f}[/]  [{color}]{arrow} {abs(change):.0f}%[/]"
+                        f"{cat:<18} [bold]{format_dollar(abs(prev), masked=m):>10}[/] → [bold]{format_dollar(abs(cur), masked=m):>10}[/]  [{color}]{arrow} {abs(change):.0f}%[/]"
                     )
                 else:
-                    lines.append(f"{cat:<18} {'':>11} → [bold]${abs(cur):>9,.2f}[/]  [dim]new[/]")
+                    lines.append(f"{cat:<18} {'':>11} → [bold]{format_dollar(abs(cur), masked=m):>10}[/]  [dim]new[/]")
 
         if not lines:
             lines.append("[dim]No comparison data yet. Run: simledge sync[/]")
@@ -128,7 +130,7 @@ class TrendsScreen(Screen):
                 bar_width = 25
                 filled = int(bar_width * (amt / max_total)) if max_total > 0 else 0
                 bar = f"[#22c55e]{chr(0x2588) * filled}[/][#333]{chr(0x2591) * (bar_width - filled)}[/]"
-                src_lines.append(f"{cat:<18} [bold]${amt:>9,.2f}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
+                src_lines.append(f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
             self.query_one("#income-sources", Static).update("\n".join(src_lines))
         else:
             self.query_one("#income-sources", Static).update("[dim]No income this month[/]")
@@ -149,9 +151,9 @@ class TrendsScreen(Screen):
                 total_cur += cur
                 total_prev += prev
                 if c["previous"] == 0:
-                    ylines.append(f"{c['category']:<14} {'':>7} \u2192 ${cur:>9,.0f}   [dim]new[/]")
+                    ylines.append(f"{c['category']:<14} {'':>7} \u2192 {format_dollar(cur, masked=m):>10}   [dim]new[/]")
                 elif c["current"] == 0:
-                    ylines.append(f"{c['category']:<14} ${prev:>7,.0f} \u2192 {'':>10}   [dim]gone[/]")
+                    ylines.append(f"{c['category']:<14} {format_dollar(prev, masked=m):>8} \u2192 {'':>10}   [dim]gone[/]")
                 elif c["change_pct"] is not None:
                     pct = c["change_pct"]
                     if pct < 0:
@@ -161,7 +163,7 @@ class TrendsScreen(Screen):
                     else:
                         arrow, color = "\u2014", "dim"
                     ylines.append(
-                        f"{c['category']:<14} ${prev:>7,.0f} \u2192 ${cur:>9,.0f}   [{color}]{arrow} {abs(pct):.1f}%[/]"
+                        f"{c['category']:<14} {format_dollar(prev, masked=m):>8} \u2192 {format_dollar(cur, masked=m):>10}   [{color}]{arrow} {abs(pct):.1f}%[/]"
                     )
             # Total line
             if total_prev > 0:
@@ -173,7 +175,7 @@ class TrendsScreen(Screen):
                 else:
                     t_arrow, t_color = "\u2014", "dim"
                 ylines.append(
-                    f"\n{'Total':<14} ${total_prev:>7,.0f} \u2192 ${total_cur:>9,.0f}   [{t_color}]{t_arrow} {abs(total_pct):.1f}%[/]"
+                    f"\n{'Total':<14} {format_dollar(total_prev, masked=m):>8} \u2192 {format_dollar(total_cur, masked=m):>10}   [{t_color}]{t_arrow} {abs(total_pct):.1f}%[/]"
                 )
             self.query_one("#yoy-category-content", Static).update("\n".join(ylines))
         else:

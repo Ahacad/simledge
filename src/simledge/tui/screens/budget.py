@@ -14,6 +14,7 @@ from simledge.budget import (
 )
 from simledge.config import DB_PATH
 from simledge.db import init_db
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -163,6 +164,7 @@ class BudgetScreen(Screen):
         self._refresh_data()
 
     def _refresh_data(self):
+        m = self.app.privacy_mode
         conn = init_db(DB_PATH)
         month = self._month
         month_display = datetime.strptime(month, "%Y-%m").strftime("%B %Y")
@@ -179,12 +181,12 @@ class BudgetScreen(Screen):
         # Summary panel
         self.query_one("#budget-summary-panel").border_title = f"Budget Summary \u2014 {month_display}"
         remaining_color = "#22c55e" if summary["total_remaining"] >= 0 else "#ef4444"
-        pace_text = f"${summary['daily_pace']:,.2f}/day" if summary["days_remaining"] > 0 else "month ended"
+        pace_text = f"{format_dollar(summary['daily_pace'], masked=m)}/day" if summary["days_remaining"] > 0 else "month ended"
         summary_text = (
-            f"[bold]Budgeted:[/] ${summary['total_budgeted']:,.2f}"
-            f"    [bold]Spent:[/] [#ef4444]${summary['total_actual']:,.2f}[/]"
-            f"    [bold]Remaining:[/] [{remaining_color}]${summary['total_remaining']:+,.2f}[/]\n"
-            f"[bold]Unbudgeted:[/] [dim]${summary['unbudgeted_spending']:,.2f}[/]"
+            f"[bold]Budgeted:[/] {format_dollar(summary['total_budgeted'], masked=m)}"
+            f"    [bold]Spent:[/] [#ef4444]{format_dollar(summary['total_actual'], masked=m)}[/]"
+            f"    [bold]Remaining:[/] [{remaining_color}]{format_dollar(summary['total_remaining'], signed=True, masked=m)}[/]\n"
+            f"[bold]Unbudgeted:[/] [dim]{format_dollar(summary['unbudgeted_spending'], masked=m)}[/]"
             f"    [bold]Pace:[/] {pace_text}"
             f"    [bold]Days left:[/] {summary['days_remaining']}"
         )
@@ -201,15 +203,15 @@ class BudgetScreen(Screen):
             bar = _progress_bar(item["pct_used"])
             table.add_row(
                 item["category"],
-                f"${item['budget']:,.2f}",
-                f"[#ef4444]${item['actual']:,.2f}[/]",
-                f"[{rem_color}]${remaining:+,.2f}[/]",
+                format_dollar(item["budget"], masked=m),
+                f"[#ef4444]{format_dollar(item['actual'], masked=m)}[/]",
+                f"[{rem_color}]{format_dollar(remaining, signed=True, masked=m)}[/]",
                 bar,
                 key=str(budget_ids.get(item["category"].lower(), item["category"])),
             )
 
         budget_count = len(items)
-        status_pace = f"${summary['daily_pace']:,.2f}/day remaining" if summary["days_remaining"] > 0 else "month ended"
+        status_pace = f"{format_dollar(summary['daily_pace'], masked=m)}/day remaining" if summary["days_remaining"] > 0 else "month ended"
         self.query_one("#budget-status", Static).update(
             f"[dim]{budget_count} budgets  |  {status_pace}  |"
             f"  n: new  d: delete  Enter: edit[/]"

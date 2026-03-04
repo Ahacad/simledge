@@ -14,6 +14,7 @@ from simledge.watchlist import (
     create_watchlist, get_watchlists, update_watchlist,
     delete_watchlist, all_watchlist_spending,
 )
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -186,6 +187,7 @@ class WatchlistScreen(Screen):
         self._refresh_data()
 
     def _refresh_data(self):
+        m = self.app.privacy_mode
         conn = init_db(DB_PATH)
         month = self._month
         month_display = datetime.strptime(month, "%Y-%m").strftime("%B %Y")
@@ -235,16 +237,16 @@ class WatchlistScreen(Screen):
                 pct = item["pct_used"]
                 warn = ""
                 if projected > target:
-                    warn = f"  [#eab308]\u26a0 Projected: ${projected:,.0f}[/]"
+                    warn = f"  [#eab308]\u26a0 Projected: {format_dollar(projected, masked=m)}[/]"
                 lines.append(
                     f"[bold]{name}[/]"
-                    f"         ${actual:,.2f} / ${target:,.2f}"
+                    f"         {format_dollar(actual, masked=m)} / {format_dollar(target, masked=m)}"
                 )
                 lines.append(f"{_progress_bar(pct)}  {pct:.0f}%{warn}")
             else:
                 lines.append(
                     f"[bold]{name}[/]"
-                    f"         ${actual:,.2f} (no target)"
+                    f"         {format_dollar(actual, masked=m)} (no target)"
                 )
 
             # Show active filters

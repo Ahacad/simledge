@@ -12,6 +12,7 @@ from textual.widgets import DataTable, Static
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.recurring import detect_recurring, calendar_bills
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -100,9 +101,10 @@ class RecurringScreen(Screen):
         monthly_total = 0.0
         count = 0
 
+        m = self.app.privacy_mode
         for item in items:
             amt = item["last_amount"]
-            amt_str = f"[#ef4444]${abs(amt):,.2f}[/]"
+            amt_str = f"[#ef4444]{format_dollar(abs(amt), masked=m)}[/]"
 
             try:
                 next_dt = datetime.strptime(item["next_expected"], "%Y-%m-%d").date()
@@ -136,8 +138,8 @@ class RecurringScreen(Screen):
         annual_total = monthly_total * 12
         summary_lines = [
             f"List view (v to switch) | {count} recurring bills",
-            f"[bold]Monthly recurring:[/]  [#ef4444]${monthly_total:>10,.2f}[/]",
-            f"[bold]Annual recurring:[/]   [#ef4444]${annual_total:>10,.2f}[/]",
+            f"[bold]Monthly recurring:[/]  [#ef4444]{format_dollar(monthly_total, masked=m):>11}[/]",
+            f"[bold]Annual recurring:[/]   [#ef4444]{format_dollar(annual_total, masked=m):>11}[/]",
         ]
         self.query_one("#bills-summary-text", Static).update(
             "\n".join(summary_lines)
@@ -179,8 +181,9 @@ class RecurringScreen(Screen):
             f"Calendar: {month_name} {y} (v to switch) | "
             f"{len(paid)} paid · {len(overdue)} overdue · {len(upcoming)} upcoming"
         )
+        m = self.app.privacy_mode
         totals = (
-            f"Paid: ${paid_total:,.2f} · Due: ${due_total:,.2f} · Overdue: ${overdue_total:,.2f}"
+            f"Paid: {format_dollar(paid_total, masked=m)} · Due: {format_dollar(due_total, masked=m)} · Overdue: {format_dollar(overdue_total, masked=m)}"
         )
         self.query_one("#bills-summary-text", Static).update(f"{summary}\n{totals}")
 
@@ -267,8 +270,9 @@ class RecurringScreen(Screen):
                     status_text = "upcoming"
 
             desc = (b["description"] or "")[:20]
+            m = self.app.privacy_mode
             lines.append(
-                f"[{color}]{marker} {b['day']:>2}  {desc:<20} ${amt:>10,.2f}   {status_text}[/]"
+                f"[{color}]{marker} {b['day']:>2}  {desc:<20} {format_dollar(amt, masked=m):>11}   {status_text}[/]"
             )
 
         return "\n".join(lines)

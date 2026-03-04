@@ -14,6 +14,7 @@ from simledge.config import DB_PATH
 from simledge.goals import all_goals_progress
 from simledge.watchlist import get_watchlists, all_watchlist_spending
 from simledge.db import init_db, get_last_sync
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -97,6 +98,7 @@ class OverviewScreen(Screen):
         self.query_one("#recent-panel").border_title = f"Recent ({recent_count})"
 
         # Summary
+        m = self.app.privacy_mode
         spending = abs(summary["total_spending"])
         income = summary["total_income"]
         net = summary["net"]
@@ -104,13 +106,13 @@ class OverviewScreen(Screen):
         income_detail = ""
         if len(inc_cats) > 1:
             top_sources = " \u00b7 ".join(
-                f"{c['category']} ${c['total']:,.0f}" for c in inc_cats[:3]
+                f"{c['category']} {format_dollar(c['total'], masked=m)}" for c in inc_cats[:3]
             )
             income_detail = f"\n[dim]  ({top_sources})[/]"
         self.query_one("#summary-content", Static).update(
-            f"[bold]Spending:[/] [#ef4444]${spending:,.2f}[/]"
-            f"    [bold]Income:[/] [#22c55e]${income:,.2f}[/]"
-            f"    [bold]Net:[/] {net_color}${net:+,.2f}[/]"
+            f"[bold]Spending:[/] [#ef4444]{format_dollar(spending, masked=m)}[/]"
+            f"    [bold]Income:[/] [#22c55e]{format_dollar(income, masked=m)}[/]"
+            f"    [bold]Net:[/] {net_color}{format_dollar(net, signed=True, masked=m)}[/]"
             + income_detail
         )
 
@@ -129,14 +131,14 @@ class OverviewScreen(Screen):
                 pct = (amt / total_spend * 100) if total_spend else 0
                 filled = int(bar_width * (pct / max_pct)) if max_pct > 0 else 0
                 bar = f"[#2dd4bf]{bar_char * filled}[/][#333]{empty_char * (bar_width - filled)}[/]"
-                lines.append(f"{cat:<18} [bold]${amt:>9,.2f}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
+                lines.append(f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
                 for child in c.get("children", []):
                     child_name = child["category"].split(":", 1)[1]
                     child_amt = abs(child["total"])
                     child_pct = (child_amt / total_spend * 100) if total_spend else 0
                     child_filled = int(bar_width * (child_pct / max_pct)) if max_pct > 0 else 0
                     child_bar = f"[#1a9985]{bar_char * child_filled}[/][#333]{empty_char * (bar_width - child_filled)}[/]"
-                    lines.append(f"  {child_name:<16} [bold]${child_amt:>9,.2f}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]")
+                    lines.append(f"  {child_name:<16} [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]")
             self.query_one("#category-content", Static).update("\n".join(lines))
         else:
             self.query_one("#category-content", Static).update("[dim]No spending data this month[/]")
@@ -169,7 +171,7 @@ class OverviewScreen(Screen):
             pace = budget_summary["daily_pace"] if budget_summary["days_remaining"] > 0 else 0
             remaining = budget_summary["total_remaining"]
             rem_color = "#22c55e" if remaining >= 0 else "#ef4444"
-            blines.append(f"\n[{rem_color}]${remaining:+,.2f} remaining[/] \u00b7 ${pace:,.2f}/day pace")
+            blines.append(f"\n[{rem_color}]{format_dollar(remaining, signed=True, masked=m)} remaining[/] \u00b7 {format_dollar(pace, masked=m)}/day pace")
             self.query_one("#budget-overview-content", Static).update("\n".join(blines))
         else:
             budget_panel.display = False
@@ -196,10 +198,10 @@ class OverviewScreen(Screen):
                 else:
                     s_arrow, s_color = "\u2014", "dim"
                 ylines.append(
-                    f"Spending  ${prev_s:,.0f} \u2192 ${cur_s:,.0f}   [{s_color}]{s_arrow} {abs(s_pct):.1f}%[/]"
+                    f"Spending  {format_dollar(prev_s, masked=m)} \u2192 {format_dollar(cur_s, masked=m)}   [{s_color}]{s_arrow} {abs(s_pct):.1f}%[/]"
                 )
             else:
-                ylines.append(f"Spending  ${cur_s:,.0f}")
+                ylines.append(f"Spending  {format_dollar(cur_s, masked=m)}")
 
             # Income line
             prev_i = yoy["previous_income"]
@@ -214,10 +216,10 @@ class OverviewScreen(Screen):
                 else:
                     i_arrow, i_color = "\u2014", "dim"
                 ylines.append(
-                    f"Income    ${prev_i:,.0f} \u2192 ${cur_i:,.0f}   [{i_color}]{i_arrow} {abs(i_pct):.1f}%[/]"
+                    f"Income    {format_dollar(prev_i, masked=m)} \u2192 {format_dollar(cur_i, masked=m)}   [{i_color}]{i_arrow} {abs(i_pct):.1f}%[/]"
                 )
             else:
-                ylines.append(f"Income    ${cur_i:,.0f}")
+                ylines.append(f"Income    {format_dollar(cur_i, masked=m)}")
 
             # YTD line
             if ytd["previous_spending"] != 0:
@@ -228,7 +230,7 @@ class OverviewScreen(Screen):
                     ytd_arrow = "\u25bc" if ytd_pct < 0 else "\u25b2"
                     ytd_color = "#22c55e" if ytd_pct < 0 else "#ef4444"
                     ylines.append(
-                        f"\nYTD: ${ytd_cur:,.0f} spent (vs ${ytd_prev:,.0f} last year, [{ytd_color}]{ytd_arrow} {abs(ytd_pct):.1f}%[/])"
+                        f"\nYTD: {format_dollar(ytd_cur, masked=m)} spent (vs {format_dollar(ytd_prev, masked=m)} last year, [{ytd_color}]{ytd_arrow} {abs(ytd_pct):.1f}%[/])"
                     )
 
             self.query_one("#yoy-content", Static).update("\n".join(ylines))
@@ -280,7 +282,7 @@ class OverviewScreen(Screen):
                     wlines.append(f"{name:<14} {bar} {pct:>5.1f}%{warn}")
                 else:
                     wlines.append(
-                        f"{name:<14} ${item['actual']:,.2f} \u00b7 {item['transaction_count']} txns"
+                        f"{name:<14} {format_dollar(item['actual'], masked=m)} \u00b7 {item['transaction_count']} txns"
                     )
             if len(wl_items) > 5:
                 wlines.append(f"[dim]... and {len(wl_items) - 5} more (press 0)[/]")
@@ -298,7 +300,7 @@ class OverviewScreen(Screen):
                 t["posted"],
                 t["description"][:30],
                 t["category"] or "\u2014",
-                f"{color}${t['amount']:+,.2f}[/]",
+                f"{color}{format_dollar(t['amount'], signed=True, masked=m)}[/]",
             )
 
         # Sync status

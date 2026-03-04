@@ -11,6 +11,7 @@ from simledge.cashflow import project_balances
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.charts import render_line_chart, GREEN, TEAL
+from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
 
@@ -74,9 +75,10 @@ class NetWorthScreen(Screen):
         chart_panel.border_title = f"Net Worth ({self._lookback}mo)"
 
         # Summary
+        m = self.app.privacy_mode
         summary_panel.border_title = "Current"
         current = values[-1] if values else 0
-        lines = [f"[bold]Net Worth:[/] ${current:,.2f}"]
+        lines = [f"[bold]Net Worth:[/] {format_dollar(current, masked=m)}"]
 
         if len(values) >= 2:
             prev = values[-2]
@@ -85,7 +87,7 @@ class NetWorthScreen(Screen):
             arrow = "▲" if change >= 0 else "▼"
             color = "#22c55e" if change >= 0 else "#ef4444"
             lines.append(
-                f"[bold]30-day Change:[/] [{color}]{arrow} ${abs(change):,.2f} ({pct:+.1f}%)[/]"
+                f"[bold]30-day Change:[/] [{color}]{arrow} {format_dollar(abs(change), masked=m)} ({pct:+.1f}%)[/]"
             )
 
         self.query_one("#nw-summary", Static).update("\n".join(lines))
@@ -156,9 +158,10 @@ class NetWorthScreen(Screen):
         pct = (change / abs(cur) * 100) if cur != 0 else 0
         change_color = "#22c55e" if change >= 0 else "#ef4444"
 
+        m = self.app.privacy_mode
         lines = [
-            f"Today: ${cur:,.0f}   30d: ${p30:,.0f}   60d: ${p60:,.0f}",
-            f"90d:   ${p90:,.0f}   [{change_color}]Change: ${change:+,.0f} ({pct:+.1f}%)[/]",
+            f"Today: {format_dollar(cur, masked=m)}   30d: {format_dollar(p30, masked=m)}   60d: {format_dollar(p60, masked=m)}",
+            f"90d:   {format_dollar(p90, masked=m)}   [{change_color}]Change: {format_dollar(change, signed=True, masked=m)} ({pct:+.1f}%)[/]",
         ]
         cf_summary_w.update("\n".join(lines))
 
@@ -169,7 +172,7 @@ class NetWorthScreen(Screen):
             for nd in neg:
                 warning_lines.append(
                     f"[#ef4444]⚠ {nd['date']}: {nd['account']} may go negative "
-                    f"(${nd['balance']:,.2f})[/]"
+                    f"({format_dollar(nd['balance'], masked=m)})[/]"
                 )
             cf_warnings.update("\n".join(warning_lines))
         else:
