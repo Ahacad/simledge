@@ -32,7 +32,7 @@ class NavBar(Static):
         parts = []
         for key, label in TABS:
             if key == active_key:
-                parts.append(f"[bold reverse] {key} {label} [/]")
+                parts.append(f"[bold #1a1a2e on #2dd4bf] {key} {label} [/]")
             else:
                 parts.append(f"[dim] {key} {label} [/]")
 

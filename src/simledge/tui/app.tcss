@@ -1,14 +1,37 @@
+/* Base */
 Screen {
     background: $surface;
 }
 
+/* NavBar */
 NavBar {
     height: 1;
-    background: $primary-background;
+    background: #1a1a2e;
     color: $text;
     padding: 0 1;
 }
 
+/* Panels — all bordered containers use this */
+.panel {
+    border: round #444;
+    padding: 1 2;
+    margin: 0 0 1 0;
+    height: auto;
+}
+
+.panel-title {
+    color: #2dd4bf;
+}
+
+/* Summary numbers */
+.summary-row {
+    height: 3;
+    padding: 1 2;
+    border: round #444;
+    margin: 0 0 1 0;
+}
+
+/* Transactions */
 #filters {
     height: 3;
     padding: 0 1;
@@ -18,18 +41,42 @@ NavBar {
     width: 1fr;
 }
 
+#search-input:focus {
+    border: round #2dd4bf;
+}
+
+#txn-table {
+    height: 1fr;
+}
+
 #txn-status {
     height: 1;
     padding: 0 1;
     color: $text-muted;
 }
 
-#sync-status {
-    height: 1;
-    padding: 0 1;
-    color: $text-muted;
+/* Sparkline charts */
+Sparkline {
+    width: 100%;
+    height: 3;
+    margin: 0 0;
 }
 
+.sparkline-spending > .sparkline--max-color {
+    color: #2dd4bf;
+}
+.sparkline-spending > .sparkline--min-color {
+    color: #2dd4bf 30%;
+}
+
+.sparkline-networth > .sparkline--max-color {
+    color: #22c55e;
+}
+.sparkline-networth > .sparkline--min-color {
+    color: #22c55e 30%;
+}
+
+/* Help modal */
 HelpScreen {
     align: center middle;
 }
@@ -38,6 +85,6 @@ HelpScreen {
     width: 50;
     height: auto;
     padding: 1 2;
-    border: round $accent;
+    border: round #2dd4bf;
     background: $surface;
 }

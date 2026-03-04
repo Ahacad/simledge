@@ -6,7 +6,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Static
 
 from simledge.analysis import spending_trend, spending_by_category
 from simledge.config import DB_PATH
@@ -22,12 +22,10 @@ except ImportError:
 
 class TrendsScreen(Screen):
     def compose(self) -> ComposeResult:
-        yield Header()
         yield NavBar("trends")
         with VerticalScroll():
             yield Static("", id="trends-chart")
             yield Static("", id="trends-content")
-        yield Footer()
 
     def on_mount(self):
         conn = init_db(DB_PATH)

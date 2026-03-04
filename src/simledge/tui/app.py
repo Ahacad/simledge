@@ -47,13 +47,13 @@ class SimpLedgeApp(App):
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS = [
-        Binding("1", "switch_mode('overview')", "Overview", priority=True),
-        Binding("2", "switch_mode('transactions')", "Transactions", priority=True),
-        Binding("3", "switch_mode('accounts')", "Accounts", priority=True),
-        Binding("4", "switch_mode('trends')", "Trends", priority=True),
-        Binding("5", "switch_mode('networth')", "Net Worth", priority=True),
-        Binding("question_mark", "show_help", "? Help", priority=True),
-        Binding("q", "quit", "Quit", priority=True),
+        Binding("1", "switch_mode('overview')", "Overview", priority=True, show=False),
+        Binding("2", "switch_mode('transactions')", "Transactions", priority=True, show=False),
+        Binding("3", "switch_mode('accounts')", "Accounts", priority=True, show=False),
+        Binding("4", "switch_mode('trends')", "Trends", priority=True, show=False),
+        Binding("5", "switch_mode('networth')", "Net Worth", priority=True, show=False),
+        Binding("question_mark", "show_help", "? Help", priority=True, show=False),
+        Binding("q", "quit", "Quit", priority=True, show=False),
     ]
 
     MODES = {

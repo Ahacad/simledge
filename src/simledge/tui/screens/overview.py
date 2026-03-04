@@ -5,7 +5,7 @@ from datetime import datetime
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Label, Static
+from textual.widgets import DataTable, Label, Static
 
 from simledge.analysis import monthly_summary, spending_by_category, recent_transactions
 from simledge.config import DB_PATH
@@ -15,7 +15,6 @@ from simledge.tui.widgets.navbar import NavBar
 
 class OverviewScreen(Screen):
     def compose(self) -> ComposeResult:
-        yield Header()
         yield NavBar("overview")
         with VerticalScroll():
             yield Label("", id="month-header")
@@ -24,7 +23,6 @@ class OverviewScreen(Screen):
             yield Label("\n  Recent Transactions", id="recent-label")
             yield DataTable(id="recent-table")
             yield Label("", id="sync-status")
-        yield Footer()
 
     def on_mount(self):
         self._refresh_data()

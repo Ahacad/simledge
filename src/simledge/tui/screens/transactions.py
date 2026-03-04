@@ -3,7 +3,7 @@
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Input, Label
+from textual.widgets import DataTable, Input, Label
 
 from simledge.config import DB_PATH
 from simledge.db import init_db
@@ -17,13 +17,11 @@ class TransactionsScreen(Screen):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Header()
         yield NavBar("transactions")
         with Horizontal(id="filters"):
             yield Input(placeholder="Press / to search...", id="search-input")
         yield DataTable(id="txn-table")
         yield Label("", id="txn-status")
-        yield Footer()
 
     def on_mount(self):
         self._load_transactions()

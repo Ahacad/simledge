@@ -3,7 +3,7 @@
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Static
 
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
@@ -13,11 +13,9 @@ from simledge.tui.widgets.navbar import NavBar
 
 class AccountsScreen(Screen):
     def compose(self) -> ComposeResult:
-        yield Header()
         yield NavBar("accounts")
         with VerticalScroll():
             yield Static("", id="accounts-content")
-        yield Footer()
 
     def on_mount(self):
         conn = init_db(DB_PATH)
