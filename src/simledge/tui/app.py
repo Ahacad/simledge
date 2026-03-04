@@ -2,16 +2,21 @@
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Center, Middle
+from textual.containers import Center, Middle, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Static
+from textual.widgets import Checkbox, Static
 
+from simledge.analysis import account_summary
+from simledge.config import DB_PATH
+from simledge.db import init_db
 from simledge.sync import run_sync
 from simledge.tui.screens.overview import OverviewScreen
 from simledge.tui.screens.transactions import TransactionsScreen
 from simledge.tui.screens.accounts import AccountsScreen
 from simledge.tui.screens.trends import TrendsScreen
 from simledge.tui.screens.networth import NetWorthScreen
+from simledge.tui.screens.rules import RulesScreen
+from simledge.tui.screens.recurring import RecurringScreen
 
 
 HELP_TEXT = """\
@@ -20,14 +25,21 @@ HELP_TEXT = """\
 [bold]Navigation[/]
   [bold]1[/]  Overview      [bold]2[/]  Transactions
   [bold]3[/]  Accounts      [bold]4[/]  Trends
-  [bold]5[/]  Net Worth
+  [bold]5[/]  Net Worth     [bold]6[/]  Rules
+  [bold]7[/]  Bills
 
 [bold]Actions[/]
   [bold]s[/]  Sync from SimpleFIN
+  [bold]a[/]  Filter accounts
   [bold]/[/]  Search (Transactions screen)
   [bold]Esc[/]  Clear search / close help
   [bold]?[/]  Show this help
   [bold]q[/]  Quit
+
+[bold]Rules Screen[/]
+  [bold]n[/]  New rule       [bold]d[/]  Delete rule
+  [bold]Enter[/]  Edit rule  [bold]r[/]  Apply rules
+  [bold]t[/]  Test (dry run)
 """
 
 
@@ -54,6 +66,8 @@ class SimpLedgeApp(App):
         Binding("3", "switch_mode('accounts')", "Accounts", priority=True, show=False),
         Binding("4", "switch_mode('trends')", "Trends", priority=True, show=False),
         Binding("5", "switch_mode('networth')", "Net Worth", priority=True, show=False),
+        Binding("6", "switch_mode('rules')", "Rules", priority=True, show=False),
+        Binding("7", "switch_mode('recurring')", "Bills", priority=True, show=False),
         Binding("s", "sync", "Sync", priority=True, show=False),
         Binding("question_mark", "show_help", "? Help", priority=True, show=False),
         Binding("q", "quit", "Quit", priority=True, show=False),
@@ -65,6 +79,8 @@ class SimpLedgeApp(App):
         "accounts": AccountsScreen,
         "trends": TrendsScreen,
         "networth": NetWorthScreen,
+        "rules": RulesScreen,
+        "recurring": RecurringScreen,
     }
 
     def on_mount(self):

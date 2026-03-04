@@ -88,3 +88,88 @@ HelpScreen {
     border: round #2dd4bf;
     background: $surface;
 }
+
+/* Transaction detail modal */
+TransactionDetailScreen {
+    align: center middle;
+}
+
+#txn-detail-box {
+    width: 60;
+    height: auto;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#txn-detail-info {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.field-label {
+    height: 1;
+    margin: 1 0 0 0;
+}
+
+#txn-detail-hint {
+    height: 1;
+    margin: 1 0 0 0;
+    text-align: center;
+}
+
+/* Rules screen */
+#rules-panel {
+    height: 1fr;
+}
+
+#rules-table {
+    height: 1fr;
+}
+
+#rules-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+/* Rule modal */
+RuleModal {
+    align: center middle;
+}
+
+#rule-modal-box {
+    width: 50;
+    height: auto;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#rule-modal-title {
+    height: 1;
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#rule-modal-box Input {
+    margin: 0 0 1 0;
+}
+
+#rule-modal-box Input:focus {
+    border: round #2dd4bf;
+}
+
+#rule-modal-hint {
+    height: 1;
+    text-align: center;
+}
+
+/* Bills / Recurring screen */
+#bills-panel {
+    height: 1fr;
+}
+
+#bills-table {
+    height: 1fr;
+}

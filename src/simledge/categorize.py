@@ -22,6 +22,14 @@ def list_rules(conn):
     return [{"id": r[0], "pattern": r[1], "category": r[2], "priority": r[3]} for r in rows]
 
 
+def update_rule(conn, rule_id, pattern, category, priority=0):
+    conn.execute(
+        "UPDATE category_rules SET pattern = ?, category = ?, priority = ? WHERE id = ?",
+        (pattern, category, priority, rule_id),
+    )
+    conn.commit()
+
+
 def delete_rule(conn, rule_id):
     conn.execute("DELETE FROM category_rules WHERE id = ?", (rule_id,))
     conn.commit()

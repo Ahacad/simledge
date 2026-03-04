@@ -9,6 +9,8 @@ TABS = [
     ("3", "Accounts"),
     ("4", "Trends"),
     ("5", "Net Worth"),
+    ("6", "Rules"),
+    ("7", "Bills"),
 ]
 
 
@@ -26,6 +28,8 @@ class NavBar(Static):
             "accounts": "3",
             "trends": "4",
             "networth": "5",
+            "rules": "6",
+            "recurring": "7",
         }
         active_key = mode_map.get(self._active, "1")
 
