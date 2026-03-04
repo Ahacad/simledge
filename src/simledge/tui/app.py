@@ -6,6 +6,7 @@ from textual.containers import Center, Middle
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
+from simledge.sync import run_sync
 from simledge.tui.screens.overview import OverviewScreen
 from simledge.tui.screens.transactions import TransactionsScreen
 from simledge.tui.screens.accounts import AccountsScreen
@@ -22,6 +23,7 @@ HELP_TEXT = """\
   [bold]5[/]  Net Worth
 
 [bold]Actions[/]
+  [bold]s[/]  Sync from SimpleFIN
   [bold]/[/]  Search (Transactions screen)
   [bold]Esc[/]  Clear search / close help
   [bold]?[/]  Show this help
@@ -52,6 +54,7 @@ class SimpLedgeApp(App):
         Binding("3", "switch_mode('accounts')", "Accounts", priority=True, show=False),
         Binding("4", "switch_mode('trends')", "Trends", priority=True, show=False),
         Binding("5", "switch_mode('networth')", "Net Worth", priority=True, show=False),
+        Binding("s", "sync", "Sync", priority=True, show=False),
         Binding("question_mark", "show_help", "? Help", priority=True, show=False),
         Binding("q", "quit", "Quit", priority=True, show=False),
     ]
@@ -69,6 +72,19 @@ class SimpLedgeApp(App):
 
     def action_show_help(self):
         self.push_screen(HelpScreen())
+
+    async def _do_sync(self):
+        result = await run_sync(quiet=True)
+        if result["status"] == "success":
+            self.notify(f"Synced {result['accounts']} accounts, {result['transactions']} transactions")
+        else:
+            self.notify(result["status"], severity="error")
+        if hasattr(self.screen, "_refresh_data"):
+            self.screen._refresh_data()
+
+    def action_sync(self):
+        self.notify("Syncing...")
+        self.run_worker(self._do_sync(), exclusive=True)
 
 
 def run_app():

@@ -104,12 +104,16 @@ def load_access_url():
         return None
 
 
-async def run_sync(full=False, start_date=None):
-    """Main sync: fetch from SimpleFIN, update local DB."""
+async def run_sync(full=False, start_date=None, quiet=False):
+    """Main sync: fetch from SimpleFIN, update local DB.
+
+    When quiet=True, suppresses print output and returns a result dict.
+    """
     access_url = load_access_url()
     if not access_url:
-        print("No SimpleFIN access URL configured. Run: simledge setup")
-        return
+        if not quiet:
+            print("No SimpleFIN access URL configured. Run: simledge setup")
+        return {"accounts": 0, "transactions": 0, "status": "error: no access URL configured"}
 
     conn = init_db(DB_PATH)
     if not start_date:
@@ -121,9 +125,10 @@ async def run_sync(full=False, start_date=None):
     except httpx.HTTPError as e:
         log.error("SimpleFIN request failed: %s", e)
         log_sync(conn, 0, 0, status=f"error: {e}")
-        print(f"Sync failed: {e}")
+        if not quiet:
+            print(f"Sync failed: {e}")
         conn.close()
-        return
+        return {"accounts": 0, "transactions": 0, "status": f"error: {e}"}
 
     institutions, accounts, balances, transactions = parse_response(data)
 
@@ -143,5 +148,7 @@ async def run_sync(full=False, start_date=None):
         txn_count += 1
 
     log_sync(conn, len(accounts), txn_count)
-    print(f"Synced {len(accounts)} accounts, {txn_count} transactions")
+    if not quiet:
+        print(f"Synced {len(accounts)} accounts, {txn_count} transactions")
     conn.close()
+    return {"accounts": len(accounts), "transactions": txn_count, "status": "success"}

@@ -1,4 +1,5 @@
 # tests/test_sync.py
+import asyncio
 import json
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -100,3 +101,40 @@ def test_parse_handles_pending_transactions():
     from simledge.sync import parse_response
     _, _, _, transactions = parse_response(response)
     assert transactions[0]["pending"] is True
+
+
+def test_run_sync_quiet_returns_result_and_no_print(tmp_path, capsys):
+    """run_sync(quiet=True) returns result dict without printing."""
+    from simledge.sync import run_sync
+
+    db_path = tmp_path / "test.db"
+    config_path = tmp_path / "config.toml"
+    config_path.write_text('[simplefin]\naccess_url = "https://fake.simplefin.org/test"\n')
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = SAMPLE_RESPONSE
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("simledge.sync.load_access_url", return_value="https://fake.simplefin.org/test"), \
+         patch("simledge.sync.DB_PATH", db_path), \
+         patch("simledge.sync.fetch_accounts", new_callable=AsyncMock, return_value=SAMPLE_RESPONSE):
+        result = asyncio.run(run_sync(quiet=True))
+
+    assert result["status"] == "success"
+    assert result["accounts"] == 1
+    assert result["transactions"] == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+
+def test_run_sync_quiet_error_returns_dict(capsys):
+    """run_sync(quiet=True) returns error dict without printing on missing config."""
+    from simledge.sync import run_sync
+
+    with patch("simledge.sync.load_access_url", return_value=None):
+        result = asyncio.run(run_sync(quiet=True))
+
+    assert result["status"].startswith("error:")
+    assert result["accounts"] == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
