@@ -31,6 +31,11 @@ git add "$file"
 git commit -m "chore(release): bump version to ${next}"
 git tag "v${next}"
 
+echo "Generating CHANGELOG.md..."
+git-cliff --output CHANGELOG.md
+git add CHANGELOG.md
+git commit -m "docs(release): update changelog for ${next}"
+
 echo ""
 echo "Done. Push with:"
 echo "  git push origin master --tags"
