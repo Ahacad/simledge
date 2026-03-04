@@ -26,9 +26,14 @@ SimpleFIN API → simledge sync → SQLite → simledge TUI
 uv tool install -e .           # install (dev)
 uv tool install -e . --force   # update after changes
 pytest                         # run tests
+uv run ruff check src/ tests/  # lint
+uv run ruff format src/ tests/ # format
 simledge                       # launch TUI
 simledge sync                  # fetch from SimpleFIN
 simledge export                # export for AI analysis
+./scripts/release.sh patch     # bump 0.1.0 → 0.1.1, commit, tag
+./scripts/release.sh minor     # bump 0.1.0 → 0.2.0, commit, tag
+./scripts/release.sh major     # bump 0.1.0 → 1.0.0, commit, tag
 ```
 
 ## Project Layout
@@ -76,12 +81,16 @@ lazygit-inspired dense panels. Do NOT deviate from this style.
 - **Dynamic panels** (e.g. Accounts per-institution) mounted at runtime via `scroll.mount(panel)`.
 - **All styling in `app.tcss`** — screens define structure, TCSS defines appearance.
 
+## Releasing
+
+Use `./scripts/release.sh <patch|minor|major>`. It bumps the version in `pyproject.toml`, commits, and creates a git tag. Then push with `git push origin master --tags` — the GitHub Action builds and publishes the release.
+
 ## Commits and Docs
 
 - **NEVER commit `docs/` directory** — design docs and plans are local working notes, not shipped artifacts
 - Auto-commit after each logical chunk
 - Conventional Commits: `type(scope): description`
-- Run `pytest` before committing
+- Run `pytest` and `ruff check` before committing
 
 ## Code Conventions
 
