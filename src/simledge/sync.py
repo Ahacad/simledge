@@ -1,5 +1,6 @@
 """SimpleFIN API client and data sync."""
 
+import asyncio
 import json
 from base64 import b64decode
 from datetime import datetime, timezone
@@ -120,6 +121,23 @@ def load_access_url():
         return None
 
 
+def _sync_error_message(error):
+    """Return user-friendly error message with actionable guidance."""
+    if isinstance(error, httpx.ConnectError):
+        return "Cannot reach SimpleFIN. Check your internet connection."
+    if isinstance(error, httpx.TimeoutException):
+        return "SimpleFIN request timed out. Try again later."
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        if status in (401, 403):
+            return "SimpleFIN access denied. Your token may have expired. Run: simledge setup"
+        if status == 429:
+            return "SimpleFIN rate limit hit. Wait a few minutes before syncing again."
+        if status >= 500:
+            return f"SimpleFIN server error ({status}). Try again later."
+    return f"Sync failed: {error}"
+
+
 async def run_sync(full=False, start_date=None, quiet=False):
     """Main sync: fetch from SimpleFIN, update local DB.
 
@@ -136,15 +154,36 @@ async def run_sync(full=False, start_date=None, quiet=False):
         start_date = None if full else get_last_sync(conn)
 
     log.info("syncing from SimpleFIN (start_date=%s, full=%s)", start_date, full)
-    try:
-        data = await fetch_accounts(access_url, start_date)
-    except httpx.HTTPError as e:
-        log.error("SimpleFIN request failed: %s", e)
-        log_sync(conn, 0, 0, status=f"error: {e}")
+    data = None
+    last_error = None
+    for attempt in range(2):
+        try:
+            data = await fetch_accounts(access_url, start_date)
+            break
+        except httpx.HTTPStatusError as e:
+            last_error = e
+            if e.response.status_code in (401, 403, 429):
+                break
+            if attempt == 0:
+                log.warning("sync attempt 1 failed: %s, retrying in 2s", e)
+                await asyncio.sleep(2)
+            else:
+                log.error("sync retry failed: %s", e)
+        except httpx.HTTPError as e:
+            last_error = e
+            if attempt == 0:
+                log.warning("sync attempt 1 failed: %s, retrying in 2s", e)
+                await asyncio.sleep(2)
+            else:
+                log.error("sync retry failed: %s", e)
+
+    if data is None:
+        error_msg = _sync_error_message(last_error)
+        log_sync(conn, 0, 0, status=f"error: {last_error}")
         if not quiet:
-            print(f"Sync failed: {e}")
+            print(f"Sync failed: {error_msg}")
         conn.close()
-        return {"accounts": 0, "transactions": 0, "status": f"error: {e}"}
+        return {"accounts": 0, "transactions": 0, "status": f"error: {error_msg}"}
 
     institutions, accounts, balances, transactions = parse_response(data)
 

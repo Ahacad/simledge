@@ -3,6 +3,7 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, patch, MagicMock
 
+import httpx
 import pytest
 
 
@@ -167,3 +168,56 @@ def test_run_sync_quiet_error_returns_dict(capsys):
     assert result["accounts"] == 0
     captured = capsys.readouterr()
     assert captured.out == ""
+
+
+def test_sync_retries_once_on_network_error(tmp_path):
+    """Sync should retry exactly once on network error, not more."""
+    from simledge.sync import run_sync
+    from simledge.db import init_db
+
+    call_count = 0
+
+    async def mock_fetch(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        raise httpx.ConnectError("connection refused")
+
+    db_path = str(tmp_path / "test.db")
+    init_db(db_path)
+
+    with patch("simledge.sync.fetch_accounts", side_effect=mock_fetch), \
+         patch("simledge.sync.load_access_url", return_value="https://fake.url"), \
+         patch("simledge.sync.DB_PATH", db_path), \
+         patch("asyncio.sleep", new_callable=AsyncMock):
+        result = asyncio.run(run_sync(quiet=True))
+
+    assert result["status"].startswith("error:")
+    assert "internet connection" in result["status"].lower()
+    assert call_count == 2  # initial + 1 retry
+
+
+def test_sync_succeeds_on_retry(tmp_path):
+    """Sync should succeed if retry works."""
+    from simledge.sync import run_sync
+    from simledge.db import init_db
+
+    call_count = 0
+
+    async def mock_fetch(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise httpx.ConnectError("temporary failure")
+        return SAMPLE_RESPONSE
+
+    db_path = str(tmp_path / "test.db")
+    init_db(db_path)
+
+    with patch("simledge.sync.fetch_accounts", side_effect=mock_fetch), \
+         patch("simledge.sync.load_access_url", return_value="https://fake.url"), \
+         patch("simledge.sync.DB_PATH", db_path), \
+         patch("asyncio.sleep", new_callable=AsyncMock):
+        result = asyncio.run(run_sync(quiet=True))
+
+    assert result["status"] == "success"
+    assert call_count == 2

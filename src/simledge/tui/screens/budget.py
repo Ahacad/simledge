@@ -46,7 +46,8 @@ class BudgetModal(ModalScreen):
                         id="budget-amount",
                     )
                     yield Static(
-                        "[dim]Enter: save  Esc: cancel[/]",
+                        "[dim]Category: max 100 chars  |  Amount: positive number\n"
+                        "Enter: save  Esc: cancel[/]",
                         id="budget-modal-hint",
                     )
 
@@ -63,6 +64,9 @@ class BudgetModal(ModalScreen):
         if not category:
             self.app.notify("Category is required", severity="error")
             return
+        if len(category) > 100:
+            self.app.notify("Category too long (max 100 chars)", severity="error")
+            return
 
         try:
             amount = float(amount_str)
@@ -70,6 +74,9 @@ class BudgetModal(ModalScreen):
                 raise ValueError
         except ValueError:
             self.app.notify("Amount must be a positive number", severity="error")
+            return
+        if amount > 1_000_000:
+            self.app.notify("Budget limit seems too high. Max $1M.", severity="error")
             return
 
         self.dismiss({"category": category, "amount": amount})

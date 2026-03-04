@@ -51,7 +51,8 @@ class GoalModal(ModalScreen):
                         id="goal-account",
                     )
                     yield Static(
-                        "[dim]Enter: save  Esc: cancel[/]",
+                        "[dim]Name: required  |  Target: positive number  |  Date: YYYY-MM-DD\n"
+                        "Enter: save  Esc: cancel[/]",
                         id="goal-modal-hint",
                     )
 
@@ -67,6 +68,9 @@ class GoalModal(ModalScreen):
         if not name:
             self.app.notify("Name is required", severity="error")
             return
+        if len(name) > 100:
+            self.app.notify("Name too long (max 100 chars)", severity="error")
+            return
         try:
             target = float(target_str)
             if target <= 0:
@@ -74,6 +78,11 @@ class GoalModal(ModalScreen):
         except ValueError:
             self.app.notify("Target must be a positive number", severity="error")
             return
+        if date_str:
+            import re
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+                self.app.notify("Date must be YYYY-MM-DD format", severity="error")
+                return
 
         result = {"name": name, "target_amount": target}
         result["target_date"] = date_str if date_str else None

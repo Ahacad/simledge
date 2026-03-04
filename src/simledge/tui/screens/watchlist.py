@@ -60,6 +60,7 @@ class WatchlistModal(ModalScreen):
                     )
                     yield Static(
                         "[dim]At least one filter required. Use % for wildcards.\n"
+                        "Name: max 100 chars  |  Target: positive number (optional)\n"
                         "Enter: save  Esc: cancel[/]",
                         id="watchlist-modal-hint",
                     )
@@ -76,6 +77,9 @@ class WatchlistModal(ModalScreen):
 
         if not name:
             self.app.notify("Name is required", severity="error")
+            return
+        if len(name) > 100:
+            self.app.notify("Name too long (max 100 chars)", severity="error")
             return
 
         if not any([fcat, ftag, fdesc]):

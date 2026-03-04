@@ -56,7 +56,8 @@ class TransactionDetailScreen(ModalScreen):
                         id="txn-tags",
                     )
                     yield Static(
-                        "[dim]Enter[/] save  [dim]Esc[/] cancel",
+                        "[dim]Category: max 100 chars  |  Notes: max 500 chars  |  Tags: comma-separated, max 50 each\n"
+                        "Enter[/] save  [dim]Esc[/] cancel",
                         id="txn-detail-hint",
                     )
 
@@ -67,7 +68,19 @@ class TransactionDetailScreen(ModalScreen):
         category = self.query_one("#txn-category", Input).value.strip()
         notes = self.query_one("#txn-notes", Input).value.strip()
         tags_raw = self.query_one("#txn-tags", Input).value
+
+        if category and len(category) > 100:
+            self.app.notify("Category too long (max 100 chars)", severity="error")
+            return
+        if notes and len(notes) > 500:
+            self.app.notify("Notes too long (max 500 chars)", severity="error")
+            return
+
         tag_names = [t.strip() for t in tags_raw.split(",") if t.strip()]
+        if any(len(t) > 50 for t in tag_names):
+            self.app.notify("Tag names max 50 chars each", severity="error")
+            return
+
         conn = init_db(DB_PATH)
         update_transaction_field(conn, self.txn["id"], "category", category or None)
         update_transaction_field(conn, self.txn["id"], "notes", notes or None)
