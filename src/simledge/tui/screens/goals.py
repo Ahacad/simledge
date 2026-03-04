@@ -106,6 +106,10 @@ class GoalsScreen(Screen):
         Binding("n", "new_goal", "New", priority=True),
         Binding("d", "delete_goal", "Delete", priority=True),
         Binding("enter", "edit_goal", "Edit", priority=True),
+        Binding("j", "select_next", "Next", show=False),
+        Binding("k", "select_prev", "Prev", show=False),
+        Binding("down", "select_next", "Next", show=False),
+        Binding("up", "select_prev", "Prev", show=False),
     ]
 
     def compose(self) -> ComposeResult:
@@ -115,6 +119,7 @@ class GoalsScreen(Screen):
             yield Static("", id="goals-status")
 
     def on_mount(self):
+        self._selected_idx = 0
         self.query_one("#goals-panel").border_title = "Savings Goals"
         self._refresh_data()
 
@@ -135,27 +140,31 @@ class GoalsScreen(Screen):
             )
             return
 
+        if progress:
+            self._selected_idx = min(self._selected_idx, len(progress) - 1)
+
         lines = []
-        for g in progress:
+        for i, g in enumerate(progress):
             pct = g["pct_complete"]
             bar = _build_progress_bar(pct)
             current = g["current_amount"]
             target = g["target_amount"]
 
+            prefix = "[bold #2dd4bf]>[/] " if i == self._selected_idx else "  "
             lines.append(
-                f"[bold]{g['name']}[/]"
+                f"{prefix}[bold]{g['name']}[/]"
                 f"     [#2dd4bf]${current:,.2f}[/] / ${target:,.2f}"
             )
-            lines.append(f"{bar}  {pct:.0f}%")
+            lines.append(f"  {bar}  {pct:.0f}%")
 
             if g["monthly_needed"] is not None:
                 td = g["target_date"]
                 month_label = td[:7] if td else ""
                 lines.append(
-                    f"[dim]Need ${g['monthly_needed']:,.2f}/mo to hit {month_label}[/]"
+                    f"  [dim]Need ${g['monthly_needed']:,.2f}/mo to hit {month_label}[/]"
                 )
             elif not g["linked"]:
-                lines.append("[dim]Link an account to track progress[/]")
+                lines.append("  [dim]Link an account to track progress[/]")
 
             lines.append("")
 
@@ -199,6 +208,19 @@ class GoalsScreen(Screen):
         conn.close()
         self._refresh_data()
 
+    def action_select_next(self):
+        conn = init_db(DB_PATH)
+        goals = get_goals(conn)
+        conn.close()
+        if goals and self._selected_idx < len(goals) - 1:
+            self._selected_idx += 1
+            self._refresh_data()
+
+    def action_select_prev(self):
+        if self._selected_idx > 0:
+            self._selected_idx -= 1
+            self._refresh_data()
+
     def action_edit_goal(self):
         conn = init_db(DB_PATH)
         goals = get_goals(conn)
@@ -206,7 +228,8 @@ class GoalsScreen(Screen):
         if not goals:
             self.app.notify("No goals to edit", severity="warning")
             return
-        goal = goals[0]
+        idx = min(self._selected_idx, len(goals) - 1)
+        goal = goals[idx]
         self.app.push_screen(GoalModal(goal=goal), callback=self._on_modal_result)
 
     def action_delete_goal(self):
@@ -216,8 +239,10 @@ class GoalsScreen(Screen):
             conn.close()
             self.app.notify("No goals to delete", severity="warning")
             return
-        goal = goals[0]
+        idx = min(self._selected_idx, len(goals) - 1)
+        goal = goals[idx]
         delete_goal(conn, goal["id"])
         conn.close()
         self.app.notify(f"Goal deleted: {goal['name']}")
+        self._selected_idx = max(0, self._selected_idx - 1)
         self._refresh_data()

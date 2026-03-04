@@ -213,6 +213,12 @@ class WatchlistScreen(Screen):
             )
             return
 
+        # Pre-fetch watchlist definitions for filter display
+        conn_wl = init_db(DB_PATH)
+        wls = get_watchlists(conn_wl)
+        conn_wl.close()
+        wl_by_id = {w["id"]: w for w in wls}
+
         lines = []
         for item in items:
             name = item["name"]
@@ -238,12 +244,8 @@ class WatchlistScreen(Screen):
                 )
 
             # Show active filters
+            wl = wl_by_id.get(item["id"])
             filters = []
-            # We need the raw watchlist data for filter display
-            conn2 = init_db(DB_PATH)
-            wls = get_watchlists(conn2)
-            conn2.close()
-            wl = next((w for w in wls if w["id"] == item["id"]), None)
             if wl:
                 if wl.get("filter_category"):
                     filters.append(f"cat: {wl['filter_category']}")

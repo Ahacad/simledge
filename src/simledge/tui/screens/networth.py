@@ -100,7 +100,10 @@ class NetWorthScreen(Screen):
 
         try:
             projection = project_balances(conn, days=90, account_ids=account_ids)
-        except Exception:
+        except Exception as e:
+            from simledge.log import setup_logging
+            _log = setup_logging("simledge.tui.networth")
+            _log.error("cash flow projection failed: %s", e, exc_info=True)
             cf_panel.border_title = "Cash Flow Projection (90 days)"
             cf_chart.update("[dim]Projection unavailable[/]")
             cf_summary_w.update("")

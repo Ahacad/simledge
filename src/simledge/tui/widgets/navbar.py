@@ -13,7 +13,7 @@ TABS = [
     ("7", "Bills"),
     ("8", "Budget"),
     ("9", "Goals"),
-    ("0", "Watch"),
+    ("0", "Watchlists"),
 ]
 
 
@@ -49,4 +49,6 @@ class NavBar(Static):
         suffix = "  [dim]? Help  a Filter  q Quit[/]"
         if hasattr(self.app, "active_account_ids") and self.app.active_account_ids is not None:
             suffix = "  [#2dd4bf][filtered][/]" + suffix
+        if hasattr(self.app, "privacy_mode") and self.app.privacy_mode:
+            suffix = "  [#eab308][private][/]" + suffix
         return "  ".join(parts) + suffix

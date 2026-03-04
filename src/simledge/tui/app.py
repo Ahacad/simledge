@@ -8,6 +8,7 @@ from textual.widgets import Checkbox, Static
 
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
+from simledge.tui.formatting import format_dollar
 from simledge.db import init_db, get_last_sync
 from simledge.sync import run_sync
 from simledge.tui.screens.overview import OverviewScreen
@@ -36,40 +37,28 @@ HELP_TEXT = """\
   [bold]h/←[/]  Prev month   [bold]l/→[/]  Next month
   [bold]t[/]  Today          [bold]-/+[/]  Adjust range
 
-[bold]Net Worth Screen[/]
-  [bold]-/+[/]  Adjust history range
-  Cash flow projection panel shows 90-day forecast
-
 [bold]Actions[/]
   [bold]s[/]  Sync from SimpleFIN
   [bold]a[/]  Filter accounts
+  [bold]p[/]  Toggle privacy mode
   [bold]/[/]  Quick search (Transactions)
   [bold]f[/]  Advanced filters (Transactions)
   [bold]Esc[/]  Clear filters / close help
   [bold]?[/]  Show this help
   [bold]q[/]  Quit
 
+[bold]CRUD Screens[/] (Rules, Budget, Goals, Watchlists)
+  [bold]n[/]  New item       [bold]d[/]  Delete item
+  [bold]Enter[/]  Edit item
+
+[bold]Goals / Watchlists[/]
+  [bold]j/↓[/]  Next item    [bold]k/↑[/]  Prev item
+
 [bold]Rules Screen[/]
-  [bold]n[/]  New rule       [bold]d[/]  Delete rule
-  [bold]Enter[/]  Edit rule  [bold]r[/]  Apply rules
-  [bold]t[/]  Test (dry run)
+  [bold]r[/]  Apply rules    [bold]t[/]  Test (dry run)
 
 [bold]Bills Screen[/]
   [bold]v[/]  Toggle list/calendar view
-  [bold]h/l[/]  Prev/next month (calendar)
-  [bold]t[/]  Today (calendar)
-
-[bold]Budget Screen[/]
-  [bold]n[/]  New budget     [bold]d[/]  Delete budget
-  [bold]Enter[/]  Edit budget
-
-[bold]Goals Screen[/]
-  [bold]n[/]  New goal       [bold]d[/]  Delete goal
-  [bold]Enter[/]  Edit goal
-
-[bold]Watchlists Screen[/]
-  [bold]n[/]  New watchlist   [bold]d[/]  Delete watchlist
-  [bold]Enter[/]  Edit watchlist
 """
 
 
@@ -116,7 +105,8 @@ class AccountFilterModal(ModalScreen):
             for a in accts:
                 bal = a["balance"] or 0
                 color = "#22c55e" if bal >= 0 else "#ef4444"
-                label = f"{a['name']}  [{color}]${bal:,.2f}[/]"
+                m = hasattr(self.app, "privacy_mode") and self.app.privacy_mode
+                label = f"{a['name']}  [{color}]{format_dollar(bal, masked=m)}[/]"
                 checked = active is None or a["id"] in active
                 cb = Checkbox(label, value=checked, id=f"filter-{a['id']}")
                 cb._account_id = a["id"]
@@ -158,6 +148,7 @@ class SimpLedgeApp(App):
         Binding("0", "switch_mode('watchlist')", "Watchlists", priority=True, show=False),
         Binding("s", "sync", "Sync", priority=True, show=False),
         Binding("a", "show_filter", "Filter", priority=True, show=False),
+        Binding("p", "toggle_privacy", "Privacy", priority=True, show=False),
         Binding("question_mark", "show_help", "? Help", priority=True, show=False),
         Binding("q", "quit", "Quit", priority=True, show=False),
     ]
@@ -178,6 +169,7 @@ class SimpLedgeApp(App):
     def __init__(self):
         super().__init__()
         self.active_account_ids = None  # None = all accounts
+        self.privacy_mode = False
 
     def on_mount(self):
         self.switch_mode("overview")
@@ -222,6 +214,13 @@ class SimpLedgeApp(App):
             self.notify(f"Synced {result['accounts']} accounts, {result['transactions']} transactions")
         else:
             self.notify(result["status"], severity="error")
+        if hasattr(self.screen, "_refresh_data"):
+            self.screen._refresh_data()
+
+    def action_toggle_privacy(self):
+        self.privacy_mode = not self.privacy_mode
+        mode = "on" if self.privacy_mode else "off"
+        self.notify(f"Privacy mode {mode}")
         if hasattr(self.screen, "_refresh_data"):
             self.screen._refresh_data()
 
