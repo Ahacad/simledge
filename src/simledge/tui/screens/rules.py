@@ -1,4 +1,4 @@
-"""Rules screen — manage categorization rules."""
+"""Rules screen — manage categorization rules via TOML file."""
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -6,8 +6,8 @@ from textual.containers import Center, Middle, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import DataTable, Input, Static
 
-from simledge.categorize import add_rule, apply_rules, delete_rule, list_rules, update_rule
-from simledge.config import DB_PATH
+from simledge.categorize import apply_rules, init_rules, load_rules, save_rules
+from simledge.config import DB_PATH, RULES_PATH
 from simledge.db import init_db
 from simledge.tui.widgets.navbar import NavBar
 
@@ -19,9 +19,10 @@ class RuleModal(ModalScreen):
         Binding("escape", "cancel", "Cancel", priority=True),
     ]
 
-    def __init__(self, rule=None):
+    def __init__(self, rule=None, index=None):
         super().__init__()
         self._rule = rule
+        self._index = index
 
     def compose(self) -> ComposeResult:
         title = "Edit Rule" if self._rule else "New Rule"
@@ -33,12 +34,12 @@ class RuleModal(ModalScreen):
                 id="rule-pattern",
             )
             yield Input(
-                placeholder="Category",
+                placeholder="Category (e.g. Food:Groceries)",
                 value=self._rule["category"] if self._rule else "",
                 id="rule-category",
             )
             yield Input(
-                placeholder="Priority (default 0)",
+                placeholder="Priority (default 0, higher = matched first)",
                 value=str(self._rule["priority"]) if self._rule else "0",
                 id="rule-priority",
             )
@@ -69,10 +70,8 @@ class RuleModal(ModalScreen):
             "pattern": pattern,
             "category": category,
             "priority": priority,
+            "index": self._index,
         }
-        if self._rule:
-            result["id"] = self._rule["id"]
-
         self.dismiss(result)
 
     def action_cancel(self):
@@ -86,6 +85,7 @@ class RulesScreen(Screen):
         Binding("enter", "edit_rule", "Edit", priority=True),
         Binding("r", "run_rules", "Apply", priority=True),
         Binding("t", "test_rules", "Dry Run", priority=True),
+        Binding("i", "init_rules", "Init Defaults", priority=True),
     ]
 
     def compose(self) -> ComposeResult:
@@ -104,33 +104,37 @@ class RulesScreen(Screen):
         self.query_one("#rules-table", DataTable).focus()
 
     def _load_rules(self):
-        conn = init_db(DB_PATH)
-        rules = list_rules(conn)
-        conn.close()
+        self._rules = load_rules(RULES_PATH)
 
         table = self.query_one("#rules-table", DataTable)
         table.clear(columns=True)
         table.add_columns("#", "Pattern", "Category", "Priority")
 
-        for r in rules:
+        for i, r in enumerate(self._rules):
             table.add_row(
-                str(r["id"]),
+                str(i + 1),
                 r["pattern"],
                 r["category"],
                 str(r["priority"]),
-                key=str(r["id"]),
+                key=str(i),
             )
 
-        self.query_one("#rules-status", Static).update(
-            f"[dim]{len(rules)} rules  |  n: new  d: delete  Enter: edit  r: apply  t: dry run[/]"
-        )
+        status = f"[dim]{len(self._rules)} rules"
+        if not self._rules:
+            status += "  |  i: init defaults"
+        status += "  |  n: new  d: delete  Enter: edit  r: apply  t: dry run[/]"
+        self.query_one("#rules-status", Static).update(status)
 
-    def _get_selected_rule_id(self):
+    def _get_selected_index(self):
         table = self.query_one("#rules-table", DataTable)
         if table.row_count == 0:
             return None
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
         return int(row_key.value)
+
+    def _save_and_reload(self):
+        save_rules(RULES_PATH, self._rules)
+        self._load_rules()
 
     def action_new_rule(self):
         self.app.push_screen(RuleModal(), callback=self._on_modal_result)
@@ -138,49 +142,55 @@ class RulesScreen(Screen):
     def _on_modal_result(self, result):
         if result is None:
             return
-        conn = init_db(DB_PATH)
-        if "id" in result:
-            update_rule(
-                conn, result["id"], result["pattern"], result["category"], result["priority"]
-            )
-            self.app.notify(f"Rule updated: {result['pattern']}")
+        rule = {
+            "pattern": result["pattern"],
+            "category": result["category"],
+            "priority": result["priority"],
+        }
+        idx = result.get("index")
+        if idx is not None:
+            self._rules[idx] = rule
+            self.app.notify(f"Rule updated: {rule['pattern']}")
         else:
-            add_rule(conn, result["pattern"], result["category"], result["priority"])
-            self.app.notify(f"Rule added: {result['pattern']}")
-        conn.close()
-        self._load_rules()
+            self._rules.append(rule)
+            self.app.notify(f"Rule added: {rule['pattern']}")
+        self._save_and_reload()
 
     def action_edit_rule(self):
-        rule_id = self._get_selected_rule_id()
-        if rule_id is None:
+        idx = self._get_selected_index()
+        if idx is None:
             self.app.notify("No rule selected", severity="warning")
             return
-        conn = init_db(DB_PATH)
-        rules = list_rules(conn)
-        conn.close()
-        rule = next((r for r in rules if r["id"] == rule_id), None)
-        if rule:
-            self.app.push_screen(RuleModal(rule=rule), callback=self._on_modal_result)
+        rule = self._rules[idx]
+        self.app.push_screen(RuleModal(rule=rule, index=idx), callback=self._on_modal_result)
 
     def action_delete_rule(self):
-        rule_id = self._get_selected_rule_id()
-        if rule_id is None:
+        idx = self._get_selected_index()
+        if idx is None:
             self.app.notify("No rule selected", severity="warning")
             return
-        conn = init_db(DB_PATH)
-        delete_rule(conn, rule_id)
-        conn.close()
+        del self._rules[idx]
+        self._save_and_reload()
         self.app.notify("Rule deleted")
-        self._load_rules()
 
     def action_run_rules(self):
+        rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
-        count = apply_rules(conn)
+        count = apply_rules(rules, conn)
         conn.close()
         self.app.notify(f"Categorized {count} transactions")
 
     def action_test_rules(self):
+        rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
-        count = apply_rules(conn, dry_run=True)
+        count = apply_rules(rules, conn, dry_run=True)
         conn.close()
         self.app.notify(f"Would categorize {count} transactions")
+
+    def action_init_rules(self):
+        created = init_rules(RULES_PATH)
+        if created:
+            self.app.notify("Default rules initialized")
+        else:
+            self.app.notify("Rules file already exists", severity="warning")
+        self._load_rules()
