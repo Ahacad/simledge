@@ -2,11 +2,11 @@
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, Center, Middle
-from textual.screen import Screen, ModalScreen
+from textual.containers import Center, Middle, Vertical
+from textual.screen import ModalScreen, Screen
 from textual.widgets import DataTable, Input, Static
 
-from simledge.categorize import add_rule, list_rules, delete_rule, update_rule, apply_rules
+from simledge.categorize import add_rule, apply_rules, delete_rule, list_rules, update_rule
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.widgets.navbar import NavBar
@@ -25,29 +25,27 @@ class RuleModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         title = "Edit Rule" if self._rule else "New Rule"
-        with Middle():
-            with Center():
-                with Vertical(id="rule-modal-box"):
-                    yield Static(f"[bold]{title}[/]", id="rule-modal-title")
-                    yield Input(
-                        placeholder="Pattern (regex or substring)",
-                        value=self._rule["pattern"] if self._rule else "",
-                        id="rule-pattern",
-                    )
-                    yield Input(
-                        placeholder="Category",
-                        value=self._rule["category"] if self._rule else "",
-                        id="rule-category",
-                    )
-                    yield Input(
-                        placeholder="Priority (default 0)",
-                        value=str(self._rule["priority"]) if self._rule else "0",
-                        id="rule-priority",
-                    )
-                    yield Static(
-                        "[dim]Enter: save  Esc: cancel[/]",
-                        id="rule-modal-hint",
-                    )
+        with Middle(), Center(), Vertical(id="rule-modal-box"):
+            yield Static(f"[bold]{title}[/]", id="rule-modal-title")
+            yield Input(
+                placeholder="Pattern (regex or substring)",
+                value=self._rule["pattern"] if self._rule else "",
+                id="rule-pattern",
+            )
+            yield Input(
+                placeholder="Category",
+                value=self._rule["category"] if self._rule else "",
+                id="rule-category",
+            )
+            yield Input(
+                placeholder="Priority (default 0)",
+                value=str(self._rule["priority"]) if self._rule else "0",
+                id="rule-priority",
+            )
+            yield Static(
+                "[dim]Enter: save  Esc: cancel[/]",
+                id="rule-modal-hint",
+            )
 
     def on_mount(self):
         self.query_one("#rule-pattern", Input).focus()
@@ -124,8 +122,7 @@ class RulesScreen(Screen):
             )
 
         self.query_one("#rules-status", Static).update(
-            f"[dim]{len(rules)} rules  |  n: new  d: delete  Enter: edit"
-            f"  r: apply  t: dry run[/]"
+            f"[dim]{len(rules)} rules  |  n: new  d: delete  Enter: edit  r: apply  t: dry run[/]"
         )
 
     def _get_selected_rule_id(self):
@@ -143,12 +140,12 @@ class RulesScreen(Screen):
             return
         conn = init_db(DB_PATH)
         if "id" in result:
-            update_rule(conn, result["id"], result["pattern"],
-                        result["category"], result["priority"])
+            update_rule(
+                conn, result["id"], result["pattern"], result["category"], result["priority"]
+            )
             self.app.notify(f"Rule updated: {result['pattern']}")
         else:
-            add_rule(conn, result["pattern"], result["category"],
-                     result["priority"])
+            add_rule(conn, result["pattern"], result["category"], result["priority"])
             self.app.notify(f"Rule added: {result['pattern']}")
         conn.close()
         self._load_rules()
@@ -163,8 +160,7 @@ class RulesScreen(Screen):
         conn.close()
         rule = next((r for r in rules if r["id"] == rule_id), None)
         if rule:
-            self.app.push_screen(RuleModal(rule=rule),
-                                 callback=self._on_modal_result)
+            self.app.push_screen(RuleModal(rule=rule), callback=self._on_modal_result)
 
     def action_delete_rule(self):
         rule_id = self._get_selected_rule_id()

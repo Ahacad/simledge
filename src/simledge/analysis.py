@@ -2,7 +2,6 @@
 
 from datetime import datetime, timedelta
 
-
 _EXCLUDE_CC = " AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
 
 
@@ -25,7 +24,7 @@ def spending_by_category(conn, month, account_ids=None):
         " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
         + filt
         + " GROUP BY cat ORDER BY total ASC",
-        [month] + filt_params,
+        [month, *filt_params],
     ).fetchall()
     return [{"category": r[0], "total": r[1]} for r in rows]
 
@@ -41,9 +40,8 @@ def monthly_summary(conn, month, account_ids=None):
         "   THEN t.amount END), 0)"
         " FROM transactions t"
         " JOIN accounts a ON t.account_id = a.id"
-        " WHERE strftime('%Y-%m', t.posted) = ?"
-        + filt,
-        [month] + filt_params,
+        " WHERE strftime('%Y-%m', t.posted) = ?" + filt,
+        [month, *filt_params],
     ).fetchone()
     spending, income = row[0], row[1]
     return {"total_spending": spending, "total_income": income, "net": income + spending}
@@ -53,9 +51,8 @@ def net_worth_on_date(conn, date, account_ids=None):
     """Sum all account balances for a given date."""
     filt, filt_params = _account_filter(account_ids)
     row = conn.execute(
-        "SELECT COALESCE(SUM(balance), 0) FROM balances WHERE date = ?"
-        + filt,
-        [date] + filt_params,
+        "SELECT COALESCE(SUM(balance), 0) FROM balances WHERE date = ?" + filt,
+        [date, *filt_params],
     ).fetchone()
     return row[0]
 
@@ -65,10 +62,8 @@ def net_worth_history(conn, months=6, account_ids=None):
     filt, filt_params = _account_filter(account_ids)
     rows = conn.execute(
         "SELECT date, SUM(balance) as total FROM balances"
-        " WHERE 1=1"
-        + filt
-        + " GROUP BY date ORDER BY date DESC LIMIT ?",
-        filt_params + [months * 31],
+        " WHERE 1=1" + filt + " GROUP BY date ORDER BY date DESC LIMIT ?",
+        [*filt_params, months * 31],
     ).fetchall()
     # Deduplicate to one per month (latest date in each month)
     by_month = {}
@@ -92,7 +87,7 @@ def spending_trend(conn, months=6, account_ids=None):
         " FROM transactions WHERE amount < 0 AND posted >= ?"
         + filt
         + " GROUP BY month ORDER BY month",
-        [start_str] + filt_params,
+        [start_str, *filt_params],
     ).fetchall()
     return [{"month": r[0], "total": r[1]} for r in rows]
 
@@ -108,7 +103,7 @@ def income_by_category(conn, month, account_ids=None):
         + _EXCLUDE_CC
         + filt
         + " GROUP BY cat ORDER BY total DESC",
-        [month] + filt_params,
+        [month, *filt_params],
     ).fetchall()
     return [{"category": r[0], "total": r[1]} for r in rows]
 
@@ -128,7 +123,7 @@ def income_trend(conn, months=6, account_ids=None):
         + _EXCLUDE_CC
         + filt
         + " GROUP BY month ORDER BY month",
-        [start_str] + filt_params,
+        [start_str, *filt_params],
     ).fetchall()
     return [{"month": r[0], "total": r[1]} for r in rows]
 
@@ -170,7 +165,7 @@ def spending_by_tag(conn, month, account_ids=None):
         " WHERE strftime('%Y-%m', t.posted) = ? AND t.amount < 0"
         + filt
         + " GROUP BY tg.name ORDER BY total ASC",
-        [month] + filt_params,
+        [month, *filt_params],
     ).fetchall()
     return [{"tag": r[0], "total": r[1]} for r in rows]
 
@@ -182,14 +177,19 @@ def recent_transactions(conn, limit=20, account_ids=None):
         "SELECT t.id, t.posted, t.amount, t.description, t.category, t.pending,"
         " a.name as account_name"
         " FROM transactions t JOIN accounts a ON t.account_id = a.id"
-        " WHERE 1=1"
-        + filt
-        + " ORDER BY t.posted DESC, t.id DESC LIMIT ?",
-        filt_params + [limit],
+        " WHERE 1=1" + filt + " ORDER BY t.posted DESC, t.id DESC LIMIT ?",
+        [*filt_params, limit],
     ).fetchall()
     return [
-        {"id": r[0], "posted": r[1], "amount": r[2], "description": r[3],
-         "category": r[4], "pending": bool(r[5]), "account": r[6]}
+        {
+            "id": r[0],
+            "posted": r[1],
+            "amount": r[2],
+            "description": r[3],
+            "category": r[4],
+            "pending": bool(r[5]),
+            "account": r[6],
+        }
         for r in rows
     ]
 
@@ -213,16 +213,17 @@ def yoy_comparison(conn, month, account_ids=None):
     for cat in all_cats:
         cur_val = cur_dict.get(cat, 0)
         prev_val = prev_dict.get(cat, 0)
-        if prev_val != 0:
-            change_pct = ((abs(cur_val) - abs(prev_val)) / abs(prev_val)) * 100
-        else:
-            change_pct = None
-        categories.append({
-            "category": cat,
-            "current": cur_val,
-            "previous": prev_val,
-            "change_pct": change_pct,
-        })
+        change_pct = (
+            ((abs(cur_val) - abs(prev_val)) / abs(prev_val)) * 100 if prev_val != 0 else None
+        )
+        categories.append(
+            {
+                "category": cat,
+                "current": cur_val,
+                "previous": prev_val,
+                "change_pct": change_pct,
+            }
+        )
     categories.sort(key=lambda c: abs(c["current"]), reverse=True)
 
     def _pct(cur, prev):
@@ -262,9 +263,8 @@ def ytd_comparison(conn, account_ids=None):
             " FROM transactions t"
             " JOIN accounts a ON t.account_id = a.id"
             " WHERE strftime('%Y', t.posted) = ?"
-            " AND strftime('%m', t.posted) <= ?"
-            + filt,
-            [year, current_month_num] + filt_params,
+            " AND strftime('%m', t.posted) <= ?" + filt,
+            [year, current_month_num, *filt_params],
         ).fetchone()
         return row[0], row[1]
 
@@ -298,14 +298,19 @@ def account_summary(conn, account_ids=None):
         " LEFT JOIN institutions i ON a.institution_id = i.id"
         " LEFT JOIN balances b ON a.id = b.account_id"
         "  AND b.date = (SELECT MAX(date) FROM balances WHERE account_id = a.id)"
-        " WHERE 1=1"
-        + filt
-        + " ORDER BY i.name, a.name",
+        " WHERE 1=1" + filt + " ORDER BY i.name, a.name",
         filt_params,
     ).fetchall()
     return [
-        {"id": r[0], "name": r[1], "type": r[2], "currency": r[3],
-         "institution": r[4], "balance": r[5], "available_balance": r[6],
-         "balance_date": r[7]}
+        {
+            "id": r[0],
+            "name": r[1],
+            "type": r[2],
+            "currency": r[3],
+            "institution": r[4],
+            "balance": r[5],
+            "available_balance": r[6],
+            "balance_date": r[7],
+        }
         for r in rows
     ]

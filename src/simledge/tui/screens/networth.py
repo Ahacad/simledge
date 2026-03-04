@@ -2,7 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll, Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Static
 
@@ -10,7 +10,7 @@ from simledge.analysis import net_worth_history
 from simledge.cashflow import project_balances
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.tui.charts import render_line_chart, GREEN, TEAL
+from simledge.tui.charts import GREEN, TEAL, render_line_chart
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -59,7 +59,9 @@ class NetWorthScreen(Screen):
 
         if not history:
             chart_panel.border_title = f"Net Worth ({self._lookback}mo)"
-            self.query_one("#nw-chart", Static).update("[dim]No balance data yet. Run: simledge sync[/]")
+            self.query_one("#nw-chart", Static).update(
+                "[dim]No balance data yet. Run: simledge sync[/]"
+            )
             summary_panel.border_title = "Current"
             self.query_one("#nw-summary", Static).update("[dim]No data[/]")
             self._refresh_cashflow(conn, account_ids)
@@ -104,6 +106,7 @@ class NetWorthScreen(Screen):
             projection = project_balances(conn, days=90, account_ids=account_ids)
         except Exception as e:
             from simledge.log import setup_logging
+
             _log = setup_logging("simledge.tui.networth")
             _log.error("cash flow projection failed: %s", e, exc_info=True)
             cf_panel.border_title = "Cash Flow Projection (90 days)"
@@ -132,6 +135,7 @@ class NetWorthScreen(Screen):
         # Chart data
         values = [d["projected_balance"] for d in daily]
         from datetime import datetime
+
         date_labels_full = []
         for d in daily:
             dt = datetime.strptime(d["date"], "%Y-%m-%d")

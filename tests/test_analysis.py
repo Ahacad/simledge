@@ -1,5 +1,11 @@
 # tests/test_analysis.py
-from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction, snapshot_balance
+from simledge.db import (
+    init_db,
+    snapshot_balance,
+    upsert_account,
+    upsert_institution,
+    upsert_transaction,
+)
 
 
 def _seed_db(tmp_path):
@@ -9,13 +15,17 @@ def _seed_db(tmp_path):
     upsert_account(conn, "acct-2", "org-1", "Credit Card", "USD", "credit")
 
     # March transactions
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -47.32, "WHOLE FOODS", category="groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -47.32, "WHOLE FOODS", category="groceries"
+    )
     upsert_transaction(conn, "t2", "acct-1", "2026-03-02", -23.99, "AMAZON", category="shopping")
     upsert_transaction(conn, "t3", "acct-1", "2026-03-01", 4225.00, "PAYROLL", category="income")
     upsert_transaction(conn, "t4", "acct-2", "2026-03-03", -52.10, "SHELL", category="gas")
 
     # February transactions
-    upsert_transaction(conn, "t5", "acct-1", "2026-02-15", -60.00, "WHOLE FOODS", category="groceries")
+    upsert_transaction(
+        conn, "t5", "acct-1", "2026-02-15", -60.00, "WHOLE FOODS", category="groceries"
+    )
     upsert_transaction(conn, "t6", "acct-1", "2026-02-15", -30.00, "SHELL", category="gas")
 
     # Balances
@@ -29,6 +39,7 @@ def _seed_db(tmp_path):
 
 def test_spending_by_category(tmp_path):
     from simledge.analysis import spending_by_category
+
     conn = _seed_db(tmp_path)
     result = spending_by_category(conn, "2026-03")
     assert any(r["category"] == "groceries" and r["total"] == -47.32 for r in result)
@@ -38,6 +49,7 @@ def test_spending_by_category(tmp_path):
 
 def test_monthly_summary(tmp_path):
     from simledge.analysis import monthly_summary
+
     conn = _seed_db(tmp_path)
     result = monthly_summary(conn, "2026-03")
     assert result["total_spending"] < 0
@@ -48,6 +60,7 @@ def test_monthly_summary(tmp_path):
 
 def test_net_worth(tmp_path):
     from simledge.analysis import net_worth_on_date
+
     conn = _seed_db(tmp_path)
     nw = net_worth_on_date(conn, "2026-03-01")
     assert nw == 4230.50 + (-1247.30)
@@ -56,6 +69,7 @@ def test_net_worth(tmp_path):
 
 def test_spending_trend(tmp_path):
     from simledge.analysis import spending_trend
+
     conn = _seed_db(tmp_path)
     result = spending_trend(conn, months=2)
     assert len(result) >= 2
@@ -67,6 +81,7 @@ def test_spending_trend(tmp_path):
 
 def test_monthly_summary_filtered(tmp_path):
     from simledge.analysis import monthly_summary
+
     conn = _seed_db(tmp_path)
     # Filter to acct-1 only — should exclude the $52.10 gas charge on acct-2
     result = monthly_summary(conn, "2026-03", account_ids={"acct-1"})
@@ -77,6 +92,7 @@ def test_monthly_summary_filtered(tmp_path):
 
 def test_spending_by_category_filtered(tmp_path):
     from simledge.analysis import spending_by_category
+
     conn = _seed_db(tmp_path)
     # Filter to acct-2 only — should only have gas
     result = spending_by_category(conn, "2026-03", account_ids={"acct-2"})
@@ -88,6 +104,7 @@ def test_spending_by_category_filtered(tmp_path):
 
 def test_recent_transactions_filtered(tmp_path):
     from simledge.analysis import recent_transactions
+
     conn = _seed_db(tmp_path)
     # Filter to acct-1 — should not include acct-2 transactions
     result = recent_transactions(conn, limit=50, account_ids={"acct-1"})
@@ -98,6 +115,7 @@ def test_recent_transactions_filtered(tmp_path):
 
 def test_net_worth_on_date_filtered(tmp_path):
     from simledge.analysis import net_worth_on_date
+
     conn = _seed_db(tmp_path)
     # Filter to acct-1 only
     nw = net_worth_on_date(conn, "2026-03-01", account_ids={"acct-1"})
@@ -107,6 +125,7 @@ def test_net_worth_on_date_filtered(tmp_path):
 
 def test_account_summary_filtered(tmp_path):
     from simledge.analysis import account_summary
+
     conn = _seed_db(tmp_path)
     result = account_summary(conn, account_ids={"acct-2"})
     assert len(result) == 1
@@ -116,8 +135,10 @@ def test_account_summary_filtered(tmp_path):
 
 # --- Category Hierarchy tests ---
 
+
 def test_spending_by_category_grouped_flat(tmp_path):
     from simledge.analysis import spending_by_category_grouped
+
     conn = _seed_db(tmp_path)
     result = spending_by_category_grouped(conn, "2026-03")
     # All categories in _seed_db are flat (no colon)
@@ -130,21 +151,26 @@ def test_spending_by_category_grouped_flat(tmp_path):
 
 def test_spending_by_category_grouped_hierarchical(tmp_path):
     from simledge.analysis import spending_by_category_grouped
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_GROCERY", category="Food:Groceries")
-    upsert_transaction(conn, "t2", "acct-1", "2026-03-02", -50.00, "TEST_DINING", category="Food:Dining")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_GROCERY", category="Food:Groceries"
+    )
+    upsert_transaction(
+        conn, "t2", "acct-1", "2026-03-02", -50.00, "TEST_DINING", category="Food:Dining"
+    )
     upsert_transaction(conn, "t3", "acct-1", "2026-03-03", -30.00, "TEST_SHOP", category="Shopping")
     result = spending_by_category_grouped(conn, "2026-03")
     # Should have 2 groups: Food (with 2 children), Shopping (flat)
     assert len(result) == 2
-    food = [g for g in result if g["category"] == "Food"][0]
+    food = next(g for g in result if g["category"] == "Food")
     assert food["total"] == -150.00
     assert len(food["children"]) == 2
     child_cats = {c["category"] for c in food["children"]}
     assert child_cats == {"Food:Groceries", "Food:Dining"}
-    shopping = [g for g in result if g["category"] == "Shopping"][0]
+    shopping = next(g for g in result if g["category"] == "Shopping")
     assert shopping["total"] == -30.00
     assert shopping["children"] == []
     conn.close()
@@ -152,10 +178,13 @@ def test_spending_by_category_grouped_hierarchical(tmp_path):
 
 def test_spending_by_category_grouped_single_child(tmp_path):
     from simledge.analysis import spending_by_category_grouped
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -75.00, "TEST_GROCERY", category="Food:Groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -75.00, "TEST_GROCERY", category="Food:Groceries"
+    )
     result = spending_by_category_grouped(conn, "2026-03")
     assert len(result) == 1
     food = result[0]
@@ -168,6 +197,7 @@ def test_spending_by_category_grouped_single_child(tmp_path):
 
 def test_spending_by_category_grouped_empty(tmp_path):
     from simledge.analysis import spending_by_category_grouped
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
@@ -178,9 +208,11 @@ def test_spending_by_category_grouped_empty(tmp_path):
 
 # --- Income Report tests ---
 
+
 def test_income_excludes_credit_card(tmp_path):
     """Credit card positive transactions should not count as income."""
-    from simledge.analysis import income_by_category, monthly_summary, income_trend
+    from simledge.analysis import income_by_category, income_trend, monthly_summary
+
     conn = _seed_db(tmp_path)
     # Add a CC payment (positive on CC account = balance reduction, NOT income)
     upsert_transaction(conn, "t-cc-pay", "acct-2", "2026-03-05", 500.00, "PAYMENT THANK YOU")
@@ -204,6 +236,7 @@ def test_income_excludes_credit_card(tmp_path):
 def test_income_includes_null_type_accounts(tmp_path):
     """Accounts with no type set should still count toward income."""
     from simledge.analysis import income_by_category
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Test Bank")
     # Account with type=None (unknown)
@@ -217,6 +250,7 @@ def test_income_includes_null_type_accounts(tmp_path):
 
 def test_income_by_category(tmp_path):
     from simledge.analysis import income_by_category
+
     conn = _seed_db(tmp_path)
     result = income_by_category(conn, "2026-03")
     assert len(result) == 1
@@ -227,6 +261,7 @@ def test_income_by_category(tmp_path):
 
 def test_income_by_category_empty(tmp_path):
     from simledge.analysis import income_by_category
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
@@ -237,6 +272,7 @@ def test_income_by_category_empty(tmp_path):
 
 def test_income_trend(tmp_path):
     from simledge.analysis import income_trend
+
     conn = _seed_db(tmp_path)
     # Add income in February too
     upsert_transaction(conn, "t7", "acct-1", "2026-02-01", 4100.00, "PAYROLL", category="income")
@@ -254,6 +290,7 @@ def test_income_trend(tmp_path):
 
 def test_income_by_category_filtered(tmp_path):
     from simledge.analysis import income_by_category
+
     conn = _seed_db(tmp_path)
     # acct-2 has no income — filter to it
     result = income_by_category(conn, "2026-03", account_ids={"acct-2"})
@@ -267,26 +304,36 @@ def test_income_by_category_filtered(tmp_path):
 
 # --- Year-over-Year tests ---
 
+
 def _seed_yoy_db(tmp_path):
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
 
     # March 2026 transactions
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_GROCERY", category="groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_GROCERY", category="groceries"
+    )
     upsert_transaction(conn, "t2", "acct-1", "2026-03-02", -50.00, "TEST_SHOP", category="shopping")
-    upsert_transaction(conn, "t3", "acct-1", "2026-03-01", 5000.00, "TEST_PAYROLL", category="income")
+    upsert_transaction(
+        conn, "t3", "acct-1", "2026-03-01", 5000.00, "TEST_PAYROLL", category="income"
+    )
 
     # March 2025 transactions (same month, previous year)
-    upsert_transaction(conn, "t4", "acct-1", "2025-03-01", -120.00, "TEST_GROCERY", category="groceries")
+    upsert_transaction(
+        conn, "t4", "acct-1", "2025-03-01", -120.00, "TEST_GROCERY", category="groceries"
+    )
     upsert_transaction(conn, "t5", "acct-1", "2025-03-02", -80.00, "TEST_SHOP", category="shopping")
-    upsert_transaction(conn, "t6", "acct-1", "2025-03-01", 4500.00, "TEST_PAYROLL", category="income")
+    upsert_transaction(
+        conn, "t6", "acct-1", "2025-03-01", 4500.00, "TEST_PAYROLL", category="income"
+    )
 
     return conn
 
 
 def test_yoy_comparison(tmp_path):
     from simledge.analysis import yoy_comparison
+
     conn = _seed_yoy_db(tmp_path)
     result = yoy_comparison(conn, "2026-03")
     assert result["current_month"] == "2026-03"
@@ -302,10 +349,13 @@ def test_yoy_comparison(tmp_path):
 
 def test_yoy_comparison_no_previous_data(tmp_path):
     from simledge.analysis import yoy_comparison
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_MERCHANT", category="groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_MERCHANT", category="groceries"
+    )
     result = yoy_comparison(conn, "2026-03")
     assert result["previous_spending"] == 0
     assert result["spending_change_pct"] is None
@@ -316,6 +366,7 @@ def test_yoy_comparison_no_previous_data(tmp_path):
 
 def test_yoy_comparison_category_new(tmp_path):
     from simledge.analysis import yoy_comparison
+
     conn = _seed_yoy_db(tmp_path)
     # Add a category that only exists in 2026
     upsert_transaction(conn, "t7", "acct-1", "2026-03-05", -30.00, "TEST_GAS", category="gas")
@@ -330,6 +381,7 @@ def test_yoy_comparison_category_new(tmp_path):
 
 def test_yoy_comparison_category_gone(tmp_path):
     from simledge.analysis import yoy_comparison
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
@@ -346,15 +398,25 @@ def test_yoy_comparison_category_gone(tmp_path):
 
 
 def test_ytd_comparison(tmp_path):
-    from simledge.analysis import ytd_comparison
-    from unittest.mock import patch
     from datetime import datetime as dt
+    from unittest.mock import patch
+
+    from simledge.analysis import ytd_comparison
+
     conn = _seed_yoy_db(tmp_path)
     # Add Jan + Feb data for both years
-    upsert_transaction(conn, "t10", "acct-1", "2026-01-15", -200.00, "TEST_JAN", category="groceries")
-    upsert_transaction(conn, "t11", "acct-1", "2026-02-15", -180.00, "TEST_FEB", category="groceries")
-    upsert_transaction(conn, "t12", "acct-1", "2025-01-15", -220.00, "TEST_JAN", category="groceries")
-    upsert_transaction(conn, "t13", "acct-1", "2025-02-15", -190.00, "TEST_FEB", category="groceries")
+    upsert_transaction(
+        conn, "t10", "acct-1", "2026-01-15", -200.00, "TEST_JAN", category="groceries"
+    )
+    upsert_transaction(
+        conn, "t11", "acct-1", "2026-02-15", -180.00, "TEST_FEB", category="groceries"
+    )
+    upsert_transaction(
+        conn, "t12", "acct-1", "2025-01-15", -220.00, "TEST_JAN", category="groceries"
+    )
+    upsert_transaction(
+        conn, "t13", "acct-1", "2025-02-15", -190.00, "TEST_FEB", category="groceries"
+    )
     # Mock datetime.now() to March 2026
     mock_now = dt(2026, 3, 15)
     with patch("simledge.analysis.datetime") as mock_dt:
@@ -371,13 +433,17 @@ def test_ytd_comparison(tmp_path):
 
 
 def test_ytd_comparison_first_year(tmp_path):
-    from simledge.analysis import ytd_comparison
-    from unittest.mock import patch
     from datetime import datetime as dt
+    from unittest.mock import patch
+
+    from simledge.analysis import ytd_comparison
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_MERCHANT", category="groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_MERCHANT", category="groceries"
+    )
     mock_now = dt(2026, 3, 15)
     with patch("simledge.analysis.datetime") as mock_dt:
         mock_dt.now.return_value = mock_now

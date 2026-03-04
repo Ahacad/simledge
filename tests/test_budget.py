@@ -1,5 +1,5 @@
 # tests/test_budget.py
-from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
+from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
 
 def _seed_db(tmp_path):
@@ -8,7 +8,9 @@ def _seed_db(tmp_path):
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
     upsert_account(conn, "acct-2", "org-1", "Credit Card", "USD", "credit")
 
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -47.32, "WHOLE FOODS", category="Groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -47.32, "WHOLE FOODS", category="Groceries"
+    )
     upsert_transaction(conn, "t2", "acct-1", "2026-03-02", -23.99, "AMAZON", category="Shopping")
     upsert_transaction(conn, "t3", "acct-1", "2026-03-01", 4225.00, "PAYROLL", category="Income")
     upsert_transaction(conn, "t4", "acct-2", "2026-03-03", -52.10, "SHELL", category="Gas")
@@ -18,7 +20,8 @@ def _seed_db(tmp_path):
 
 
 def test_set_budget(tmp_path):
-    from simledge.budget import set_budget, get_budgets
+    from simledge.budget import get_budgets, set_budget
+
     conn = _seed_db(tmp_path)
 
     set_budget(conn, "Groceries", 400.00)
@@ -36,7 +39,8 @@ def test_set_budget(tmp_path):
 
 
 def test_get_budgets(tmp_path):
-    from simledge.budget import set_budget, get_budgets
+    from simledge.budget import get_budgets, set_budget
+
     conn = _seed_db(tmp_path)
 
     set_budget(conn, "Groceries", 400.00)
@@ -53,7 +57,8 @@ def test_get_budgets(tmp_path):
 
 
 def test_delete_budget(tmp_path):
-    from simledge.budget import set_budget, get_budgets, delete_budget
+    from simledge.budget import delete_budget, get_budgets, set_budget
+
     conn = _seed_db(tmp_path)
 
     set_budget(conn, "Groceries", 400.00)
@@ -67,7 +72,8 @@ def test_delete_budget(tmp_path):
 
 
 def test_budget_vs_actual(tmp_path):
-    from simledge.budget import set_budget, budget_vs_actual
+    from simledge.budget import budget_vs_actual, set_budget
+
     conn = _seed_db(tmp_path)
 
     set_budget(conn, "Groceries", 400.00)
@@ -86,7 +92,8 @@ def test_budget_vs_actual(tmp_path):
 
 
 def test_budget_vs_actual_no_spending(tmp_path):
-    from simledge.budget import set_budget, budget_vs_actual
+    from simledge.budget import budget_vs_actual, set_budget
+
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
@@ -103,6 +110,7 @@ def test_budget_vs_actual_no_spending(tmp_path):
 
 def test_total_budget_summary(tmp_path):
     from simledge.budget import set_budget, total_budget_summary
+
     conn = _seed_db(tmp_path)
 
     set_budget(conn, "Groceries", 400.00)
@@ -121,7 +129,8 @@ def test_total_budget_summary(tmp_path):
 
 
 def test_budget_vs_actual_with_account_filter(tmp_path):
-    from simledge.budget import set_budget, budget_vs_actual
+    from simledge.budget import budget_vs_actual, set_budget
+
     conn = _seed_db(tmp_path)
 
     set_budget(conn, "Gas", 150.00)

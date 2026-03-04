@@ -1,7 +1,7 @@
 """Accounts screen — balances grouped by institution."""
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll, Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Static
 

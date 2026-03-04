@@ -2,7 +2,6 @@
 
 from textual.widgets import Static
 
-
 TABS = [
     ("1", "Overview"),
     ("2", "Transactions"),

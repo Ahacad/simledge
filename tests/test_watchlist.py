@@ -1,9 +1,10 @@
 # tests/test_watchlist.py
-import pytest
-from unittest.mock import patch
 from datetime import date
+from unittest.mock import patch
 
-from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
+import pytest
+
+from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
 
 def _seed_db(tmp_path):
@@ -12,13 +13,23 @@ def _seed_db(tmp_path):
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
 
     # Food transactions
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -25.00, "STARBUCKS", category="Food:Coffee")
-    upsert_transaction(conn, "t2", "acct-1", "2026-03-05", -30.00, "STARBUCKS", category="Food:Coffee")
-    upsert_transaction(conn, "t3", "acct-1", "2026-03-10", -50.00, "WHOLE FOODS", category="Food:Groceries")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -25.00, "STARBUCKS", category="Food:Coffee"
+    )
+    upsert_transaction(
+        conn, "t2", "acct-1", "2026-03-05", -30.00, "STARBUCKS", category="Food:Coffee"
+    )
+    upsert_transaction(
+        conn, "t3", "acct-1", "2026-03-10", -50.00, "WHOLE FOODS", category="Food:Groceries"
+    )
 
     # Amazon transactions
-    upsert_transaction(conn, "t4", "acct-1", "2026-03-02", -100.00, "AMAZON PURCHASE", category="Shopping")
-    upsert_transaction(conn, "t5", "acct-1", "2026-03-08", -75.00, "AMAZON PRIME", category="Shopping")
+    upsert_transaction(
+        conn, "t4", "acct-1", "2026-03-02", -100.00, "AMAZON PURCHASE", category="Shopping"
+    )
+    upsert_transaction(
+        conn, "t5", "acct-1", "2026-03-08", -75.00, "AMAZON PRIME", category="Shopping"
+    )
 
     # Income
     upsert_transaction(conn, "t6", "acct-1", "2026-03-01", 5000.00, "PAYROLL", category="Income")
@@ -28,6 +39,7 @@ def _seed_db(tmp_path):
 
 def test_create_watchlist(tmp_path):
     from simledge.watchlist import create_watchlist, get_watchlists
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Coffee", monthly_target=100.00, filter_category="Food:Coffee")
@@ -42,6 +54,7 @@ def test_create_watchlist(tmp_path):
 
 def test_create_watchlist_validation(tmp_path):
     from simledge.watchlist import create_watchlist
+
     conn = _seed_db(tmp_path)
 
     with pytest.raises(ValueError, match="at least one filter"):
@@ -51,6 +64,7 @@ def test_create_watchlist_validation(tmp_path):
 
 def test_watchlist_spending_category(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Coffee", monthly_target=100.00, filter_category="Food:Coffee")
@@ -67,6 +81,7 @@ def test_watchlist_spending_category(tmp_path):
 
 def test_watchlist_spending_description(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Amazon", filter_description="%amazon%")
@@ -82,13 +97,12 @@ def test_watchlist_spending_description(tmp_path):
 
 def test_watchlist_spending_tag(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     # Create a tag and tag a transaction
     conn.execute("INSERT INTO tags (name) VALUES ('vacation')")
-    conn.execute(
-        "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ('t4', 1)"
-    )
+    conn.execute("INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ('t4', 1)")
     conn.commit()
 
     wl_id = create_watchlist(conn, "Vacation", filter_tag="vacation")
@@ -104,11 +118,13 @@ def test_watchlist_spending_tag(tmp_path):
 
 def test_watchlist_spending_combined(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     # Category + description filter AND'd: only STARBUCKS under Food:Coffee
     wl_id = create_watchlist(
-        conn, "Starbucks Coffee",
+        conn,
+        "Starbucks Coffee",
         filter_category="Food:Coffee",
         filter_description="%starbucks%",
     )
@@ -124,6 +140,7 @@ def test_watchlist_spending_combined(tmp_path):
 
 def test_watchlist_spending_with_target(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Coffee", monthly_target=100.00, filter_category="Food:Coffee")
@@ -139,6 +156,7 @@ def test_watchlist_spending_with_target(tmp_path):
 
 def test_watchlist_spending_no_target(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Amazon", filter_description="%amazon%")
@@ -155,6 +173,7 @@ def test_watchlist_spending_no_target(tmp_path):
 
 def test_watchlist_projected(tmp_path):
     from simledge.watchlist import create_watchlist, watchlist_spending
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Coffee", monthly_target=100.00, filter_category="Food:Coffee")
@@ -171,7 +190,8 @@ def test_watchlist_projected(tmp_path):
 
 
 def test_delete_watchlist(tmp_path):
-    from simledge.watchlist import create_watchlist, get_watchlists, delete_watchlist
+    from simledge.watchlist import create_watchlist, delete_watchlist, get_watchlists
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Coffee", filter_category="Food:Coffee")
@@ -184,6 +204,7 @@ def test_delete_watchlist(tmp_path):
 
 def test_update_watchlist(tmp_path):
     from simledge.watchlist import create_watchlist, get_watchlists, update_watchlist
+
     conn = _seed_db(tmp_path)
 
     wl_id = create_watchlist(conn, "Coffee", monthly_target=100.00, filter_category="Food:Coffee")

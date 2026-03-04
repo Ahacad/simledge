@@ -2,7 +2,7 @@
 
 import os
 
-from simledge.compat import data_dir, config_dir
+from simledge.compat import config_dir, data_dir
 
 # Paths
 DATA_DIR = data_dir()

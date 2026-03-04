@@ -1,11 +1,8 @@
 # tests/test_sync.py
 import asyncio
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
-
 
 SAMPLE_RESPONSE = {
     "accounts": [
@@ -40,6 +37,7 @@ SAMPLE_RESPONSE = {
 
 def test_parse_simplefin_response():
     from simledge.sync import parse_response
+
     institutions, accounts, balances, transactions = parse_response(SAMPLE_RESPONSE)
 
     assert len(institutions) == 1
@@ -73,7 +71,8 @@ def test_parse_handles_missing_org():
         ]
     }
     from simledge.sync import parse_response
-    institutions, accounts, balances, transactions = parse_response(response)
+
+    institutions, accounts, _balances, _transactions = parse_response(response)
     assert len(institutions) == 0
     assert accounts[0]["institution_id"] is None
 
@@ -100,6 +99,7 @@ def test_parse_handles_pending_transactions():
         ]
     }
     from simledge.sync import parse_response
+
     _, _, _, transactions = parse_response(response)
     assert transactions[0]["pending"] is True
 
@@ -116,9 +116,11 @@ def test_run_sync_quiet_returns_result_and_no_print(tmp_path, capsys):
     mock_response.json.return_value = SAMPLE_RESPONSE
     mock_response.raise_for_status = MagicMock()
 
-    with patch("simledge.sync.load_access_url", return_value="https://fake.simplefin.org/test"), \
-         patch("simledge.sync.DB_PATH", db_path), \
-         patch("simledge.sync.fetch_accounts", new_callable=AsyncMock, return_value=SAMPLE_RESPONSE):
+    with (
+        patch("simledge.sync.load_access_url", return_value="https://fake.simplefin.org/test"),
+        patch("simledge.sync.DB_PATH", db_path),
+        patch("simledge.sync.fetch_accounts", new_callable=AsyncMock, return_value=SAMPLE_RESPONSE),
+    ):
         result = asyncio.run(run_sync(quiet=True))
 
     assert result["status"] == "success"
@@ -130,7 +132,9 @@ def test_run_sync_quiet_returns_result_and_no_print(tmp_path, capsys):
 
 def test_sync_is_stale_after_24h(tmp_path):
     from datetime import datetime, timedelta
-    from simledge.db import init_db, get_last_sync
+
+    from simledge.db import get_last_sync, init_db
+
     conn = init_db(str(tmp_path / "test.db"))
     # Log a sync 25 hours ago
     old_time = (datetime.now() - timedelta(hours=25)).strftime("%Y-%m-%d %H:%M:%S")
@@ -148,7 +152,9 @@ def test_sync_is_stale_after_24h(tmp_path):
 
 def test_sync_is_fresh_within_24h(tmp_path):
     from datetime import datetime
-    from simledge.db import init_db, log_sync, get_last_sync
+
+    from simledge.db import get_last_sync, init_db, log_sync
+
     conn = init_db(str(tmp_path / "test.db"))
     log_sync(conn, 1, 10)  # logs "now"
     last = get_last_sync(conn)
@@ -172,8 +178,8 @@ def test_run_sync_quiet_error_returns_dict(capsys):
 
 def test_sync_retries_once_on_network_error(tmp_path):
     """Sync should retry exactly once on network error, not more."""
-    from simledge.sync import run_sync
     from simledge.db import init_db
+    from simledge.sync import run_sync
 
     call_count = 0
 
@@ -185,10 +191,12 @@ def test_sync_retries_once_on_network_error(tmp_path):
     db_path = str(tmp_path / "test.db")
     init_db(db_path)
 
-    with patch("simledge.sync.fetch_accounts", side_effect=mock_fetch), \
-         patch("simledge.sync.load_access_url", return_value="https://fake.url"), \
-         patch("simledge.sync.DB_PATH", db_path), \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+    with (
+        patch("simledge.sync.fetch_accounts", side_effect=mock_fetch),
+        patch("simledge.sync.load_access_url", return_value="https://fake.url"),
+        patch("simledge.sync.DB_PATH", db_path),
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
         result = asyncio.run(run_sync(quiet=True))
 
     assert result["status"].startswith("error:")
@@ -198,8 +206,8 @@ def test_sync_retries_once_on_network_error(tmp_path):
 
 def test_sync_succeeds_on_retry(tmp_path):
     """Sync should succeed if retry works."""
-    from simledge.sync import run_sync
     from simledge.db import init_db
+    from simledge.sync import run_sync
 
     call_count = 0
 
@@ -213,10 +221,12 @@ def test_sync_succeeds_on_retry(tmp_path):
     db_path = str(tmp_path / "test.db")
     init_db(db_path)
 
-    with patch("simledge.sync.fetch_accounts", side_effect=mock_fetch), \
-         patch("simledge.sync.load_access_url", return_value="https://fake.url"), \
-         patch("simledge.sync.DB_PATH", db_path), \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+    with (
+        patch("simledge.sync.fetch_accounts", side_effect=mock_fetch),
+        patch("simledge.sync.load_access_url", return_value="https://fake.url"),
+        patch("simledge.sync.DB_PATH", db_path),
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
         result = asyncio.run(run_sync(quiet=True))
 
     assert result["status"] == "success"

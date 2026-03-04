@@ -11,7 +11,7 @@ from textual.widgets import DataTable, Static
 
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.recurring import detect_recurring, calendar_bills
+from simledge.recurring import calendar_bills, detect_recurring
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -92,7 +92,11 @@ class RecurringScreen(Screen):
         table = self.query_one("#bills-table", DataTable)
         table.clear(columns=True)
         table.add_columns(
-            "Description", "Amount", "Frequency", "Last", "Next Expected",
+            "Description",
+            "Amount",
+            "Frequency",
+            "Last",
+            "Next Expected",
             "Account",
         )
 
@@ -141,9 +145,7 @@ class RecurringScreen(Screen):
             f"[bold]Monthly recurring:[/]  [#ef4444]{format_dollar(monthly_total, masked=m):>11}[/]",
             f"[bold]Annual recurring:[/]   [#ef4444]{format_dollar(annual_total, masked=m):>11}[/]",
         ]
-        self.query_one("#bills-summary-text", Static).update(
-            "\n".join(summary_lines)
-        )
+        self.query_one("#bills-summary-text", Static).update("\n".join(summary_lines))
 
     def _show_calendar_view(self):
         # Hide list, show calendar panels
@@ -182,9 +184,7 @@ class RecurringScreen(Screen):
             f"{len(paid)} paid · {len(overdue)} overdue · {len(upcoming)} upcoming"
         )
         m = self.app.privacy_mode
-        totals = (
-            f"Paid: {format_dollar(paid_total, masked=m)} · Due: {format_dollar(due_total, masked=m)} · Overdue: {format_dollar(overdue_total, masked=m)}"
-        )
+        totals = f"Paid: {format_dollar(paid_total, masked=m)} · Due: {format_dollar(due_total, masked=m)} · Overdue: {format_dollar(overdue_total, masked=m)}"
         self.query_one("#bills-summary-text", Static).update(f"{summary}\n{totals}")
 
     def _build_grid(self, year, month, bills):
@@ -214,7 +214,7 @@ class RecurringScreen(Screen):
                 if day == 0:
                     cells.append("      ")
                 else:
-                    is_today = (year == today.year and month == today.month and day == today.day)
+                    is_today = year == today.year and month == today.month and day == today.day
                     if day in day_status:
                         pre, post = status_markers[day_status[day]]
                         s = f"{pre}{day:>2}{post}"

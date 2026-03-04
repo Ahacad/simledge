@@ -2,9 +2,8 @@
 
 import argparse
 import asyncio
-import sys
 
-from simledge.config import DB_PATH, CONFIG_PATH
+from simledge.config import CONFIG_PATH, DB_PATH
 
 
 def main():
@@ -55,13 +54,16 @@ def main():
 
 def _run_tui():
     from simledge.tui.app import run_app
+
     run_app()
 
 
 def _run_sync(args):
     if args.raw:
-        from simledge.sync import load_access_url, fetch_accounts
         import json
+
+        from simledge.sync import fetch_accounts, load_access_url
+
         access_url = load_access_url()
         if not access_url:
             print("No SimpleFIN access URL configured. Run: simledge setup")
@@ -70,11 +72,12 @@ def _run_sync(args):
         print(json.dumps(data, indent=2))
         return
     from simledge.sync import run_sync
+
     asyncio.run(run_sync(full=args.full, start_date=args.start))
 
 
 def _run_status():
-    from simledge.db import init_db, get_last_sync
+    from simledge.db import get_last_sync, init_db
 
     conn = init_db(DB_PATH)
     last = get_last_sync(conn)
@@ -89,6 +92,7 @@ def _run_status():
 
 def _run_setup():
     import os
+
     print("SimpLedge Setup")
     print("=" * 40)
     print()
@@ -108,7 +112,9 @@ def _run_setup():
 
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
-        f.write(f'[simplefin]\naccess_url = "{access_url}"\n\n[sync]\nauto_pending = true\n\n[export]\ndefault_format = "markdown"\n')
+        f.write(
+            f'[simplefin]\naccess_url = "{access_url}"\n\n[sync]\nauto_pending = true\n\n[export]\ndefault_format = "markdown"\n'
+        )
     os.chmod(CONFIG_PATH, 0o600)
     print(f"\nConfig saved to {CONFIG_PATH} (permissions: 600)")
     print("Run 'simledge sync' to fetch your data.")
@@ -116,6 +122,7 @@ def _run_setup():
 
 async def _claim_token(token):
     from base64 import b64decode
+
     import httpx
 
     try:
@@ -138,8 +145,9 @@ async def _claim_token(token):
 
 def _run_export(args):
     from datetime import datetime
+
     from simledge.db import init_db
-    from simledge.export import export_markdown, export_csv, export_json
+    from simledge.export import export_csv, export_json, export_markdown
 
     month = args.month or datetime.now().strftime("%Y-%m")
     conn = init_db(DB_PATH)
@@ -155,8 +163,8 @@ def _run_export(args):
 
 
 def _run_rule(args):
+    from simledge.categorize import add_rule, apply_rules, list_rules
     from simledge.db import init_db
-    from simledge.categorize import add_rule, list_rules, apply_rules
 
     conn = init_db(DB_PATH)
 

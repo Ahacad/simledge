@@ -2,16 +2,20 @@
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll, Center, Middle
-from textual.screen import Screen, ModalScreen
-from textual.widgets import DataTable, Input, Static
+from textual.containers import Center, Middle, Vertical, VerticalScroll
+from textual.screen import ModalScreen, Screen
+from textual.widgets import Input, Static
 
+from simledge.analysis import account_summary
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.goals import (
-    create_goal, get_goals, update_goal, delete_goal, all_goals_progress,
+    all_goals_progress,
+    create_goal,
+    delete_goal,
+    get_goals,
+    update_goal,
 )
-from simledge.analysis import account_summary
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -27,35 +31,33 @@ class GoalModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         title = "Edit Goal" if self._goal else "New Goal"
-        with Middle():
-            with Center():
-                with Vertical(id="goal-modal-box"):
-                    yield Static(f"[bold]{title}[/]", id="goal-modal-title")
-                    yield Input(
-                        placeholder="Goal name",
-                        value=self._goal["name"] if self._goal else "",
-                        id="goal-name",
-                    )
-                    yield Input(
-                        placeholder="Target amount",
-                        value=str(self._goal["target_amount"]) if self._goal else "",
-                        id="goal-target",
-                    )
-                    yield Input(
-                        placeholder="Target date (YYYY-MM-DD, optional)",
-                        value=self._goal["target_date"] or "" if self._goal else "",
-                        id="goal-date",
-                    )
-                    yield Input(
-                        placeholder="Account name (optional, for auto-tracking)",
-                        value="",
-                        id="goal-account",
-                    )
-                    yield Static(
-                        "[dim]Name: required  |  Target: positive number  |  Date: YYYY-MM-DD\n"
-                        "Enter: save  Esc: cancel[/]",
-                        id="goal-modal-hint",
-                    )
+        with Middle(), Center(), Vertical(id="goal-modal-box"):
+            yield Static(f"[bold]{title}[/]", id="goal-modal-title")
+            yield Input(
+                placeholder="Goal name",
+                value=self._goal["name"] if self._goal else "",
+                id="goal-name",
+            )
+            yield Input(
+                placeholder="Target amount",
+                value=str(self._goal["target_amount"]) if self._goal else "",
+                id="goal-target",
+            )
+            yield Input(
+                placeholder="Target date (YYYY-MM-DD, optional)",
+                value=self._goal["target_date"] or "" if self._goal else "",
+                id="goal-date",
+            )
+            yield Input(
+                placeholder="Account name (optional, for auto-tracking)",
+                value="",
+                id="goal-account",
+            )
+            yield Static(
+                "[dim]Name: required  |  Target: positive number  |  Date: YYYY-MM-DD\n"
+                "Enter: save  Esc: cancel[/]",
+                id="goal-modal-hint",
+            )
 
     def on_mount(self):
         self.query_one("#goal-name", Input).focus()
@@ -81,6 +83,7 @@ class GoalModal(ModalScreen):
             return
         if date_str:
             import re
+
             if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
                 self.app.notify("Date must be YYYY-MM-DD format", severity="error")
                 return
@@ -146,9 +149,7 @@ class GoalsScreen(Screen):
             self.query_one("#goals-content", Static).update(
                 "[dim]No goals yet. Press n to create one.[/]"
             )
-            self.query_one("#goals-status", Static).update(
-                "[dim]0 goals  |  n: new[/]"
-            )
+            self.query_one("#goals-status", Static).update("[dim]0 goals  |  n: new[/]")
             return
 
         if progress:
@@ -202,7 +203,8 @@ class GoalsScreen(Screen):
         conn = init_db(DB_PATH)
         if "id" in result:
             update_goal(
-                conn, result["id"],
+                conn,
+                result["id"],
                 name=result["name"],
                 target_amount=result["target_amount"],
                 target_date=result.get("target_date"),
@@ -211,7 +213,9 @@ class GoalsScreen(Screen):
         else:
             account_id = self._resolve_account_id(conn, result.get("account_name"))
             create_goal(
-                conn, result["name"], result["target_amount"],
+                conn,
+                result["name"],
+                result["target_amount"],
                 target_date=result.get("target_date"),
                 account_id=account_id,
             )

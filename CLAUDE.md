@@ -103,6 +103,22 @@ lazygit-inspired dense panels. Do NOT deviate from this style.
 - Conventional Commits: `type(scope): description`
 - Run `pytest` before committing
 
+## Development Workflow — Team Mode
+
+For non-trivial features, use the team leader + parallel teammates pattern:
+
+1. **Team leader discusses with human** — clarify requirements, specs, edge cases, and scope before any code is written. Agree on the plan.
+2. **Team leader creates tasks** — break the plan into independent, parallelizable units of work.
+3. **Spawn teammates in worktrees** — each teammate works in an isolated git worktree (`isolation: "worktree"`), so they can't step on each other. Assign one task (or a small group of related tasks) per teammate.
+4. **Teammates work in parallel** — each builds, tests, and commits in their own worktree branch. Follow all project conventions (code style, testing, commit messages).
+5. **Merge and report** — team leader merges each teammate's branch into the main working branch, resolves any conflicts, runs full test suite, and reports results to the human.
+
+Key rules:
+- **Worktree isolation is mandatory** for parallel teammates — never have two agents editing the same branch.
+- **Each teammate runs `pytest` before finishing** — don't hand broken code back to the leader.
+- **Team leader owns the merge** — teammates do not push to master or merge themselves.
+- **Keep the human in the loop** — report progress at milestones, surface blockers immediately.
+
 ## Testing
 
 ```bash

@@ -9,7 +9,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Checkbox, DataTable, Input, Static
 
 from simledge.config import DB_PATH
-from simledge.db import init_db, get_transaction
+from simledge.db import get_transaction, init_db
 from simledge.tags import get_transaction_tags
 from simledge.tui.formatting import format_dollar
 from simledge.tui.screens.transaction_detail import TransactionDetailScreen
@@ -28,49 +28,47 @@ class FilterModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         f = self._current
-        with Middle():
-            with Center():
-                with Vertical(id="filter-modal-box"):
-                    yield Static("[bold]Filters[/]", id="filter-modal-title")
-                    yield Static("[dim]Description[/]", classes="field-label")
-                    yield Input(
-                        value=f.get("description", ""),
-                        placeholder="Filter by description...",
-                        id="filter-description",
-                    )
-                    yield Static("[dim]Category[/]", classes="field-label")
-                    yield Input(
-                        value=f.get("category", ""),
-                        placeholder="Filter by category...",
-                        id="filter-category",
-                    )
-                    yield Static("[dim]Tag[/]", classes="field-label")
-                    yield Input(
-                        value=f.get("tag", ""),
-                        placeholder="Filter by tag...",
-                        id="filter-tag",
-                    )
-                    yield Static("[dim]Min amount[/]", classes="field-label")
-                    yield Input(
-                        value=f.get("min_amount", ""),
-                        placeholder="e.g. 50",
-                        id="filter-min-amount",
-                    )
-                    yield Static("[dim]Max amount[/]", classes="field-label")
-                    yield Input(
-                        value=f.get("max_amount", ""),
-                        placeholder="e.g. 500",
-                        id="filter-max-amount",
-                    )
-                    yield Checkbox(
-                        "Pending only",
-                        value=f.get("pending_only", False),
-                        id="filter-pending",
-                    )
-                    yield Static(
-                        "[dim]Enter[/] apply  [dim]Esc[/] cancel  [dim]c[/] clear all",
-                        id="filter-modal-hint",
-                    )
+        with Middle(), Center(), Vertical(id="filter-modal-box"):
+            yield Static("[bold]Filters[/]", id="filter-modal-title")
+            yield Static("[dim]Description[/]", classes="field-label")
+            yield Input(
+                value=f.get("description", ""),
+                placeholder="Filter by description...",
+                id="filter-description",
+            )
+            yield Static("[dim]Category[/]", classes="field-label")
+            yield Input(
+                value=f.get("category", ""),
+                placeholder="Filter by category...",
+                id="filter-category",
+            )
+            yield Static("[dim]Tag[/]", classes="field-label")
+            yield Input(
+                value=f.get("tag", ""),
+                placeholder="Filter by tag...",
+                id="filter-tag",
+            )
+            yield Static("[dim]Min amount[/]", classes="field-label")
+            yield Input(
+                value=f.get("min_amount", ""),
+                placeholder="e.g. 50",
+                id="filter-min-amount",
+            )
+            yield Static("[dim]Max amount[/]", classes="field-label")
+            yield Input(
+                value=f.get("max_amount", ""),
+                placeholder="e.g. 500",
+                id="filter-max-amount",
+            )
+            yield Checkbox(
+                "Pending only",
+                value=f.get("pending_only", False),
+                id="filter-pending",
+            )
+            yield Static(
+                "[dim]Enter[/] apply  [dim]Esc[/] cancel  [dim]c[/] clear all",
+                id="filter-modal-hint",
+            )
 
     def on_input_submitted(self, event: Input.Submitted):
         self._apply()
@@ -109,18 +107,16 @@ class TagFilterModal(ModalScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        with Middle():
-            with Center():
-                with Vertical(id="tag-filter-box"):
-                    yield Static("[bold]Filter by Tag[/]", id="tag-filter-title")
-                    yield Input(
-                        placeholder="Enter tag name...",
-                        id="tag-filter-input",
-                    )
-                    yield Static(
-                        "[dim]Enter[/] apply  [dim]Esc[/] cancel",
-                        id="tag-filter-hint",
-                    )
+        with Middle(), Center(), Vertical(id="tag-filter-box"):
+            yield Static("[bold]Filter by Tag[/]", id="tag-filter-title")
+            yield Input(
+                placeholder="Enter tag name...",
+                id="tag-filter-input",
+            )
+            yield Static(
+                "[dim]Enter[/] apply  [dim]Esc[/] cancel",
+                id="tag-filter-hint",
+            )
 
     def on_mount(self):
         self.query_one("#tag-filter-input", Input).focus()

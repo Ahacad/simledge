@@ -1,9 +1,15 @@
 # tests/test_cashflow.py
 from datetime import date, timedelta
 
-from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction, snapshot_balance
-from simledge.recurring import generate_occurrences
 from simledge.cashflow import project_balances
+from simledge.db import (
+    init_db,
+    snapshot_balance,
+    upsert_account,
+    upsert_institution,
+    upsert_transaction,
+)
+from simledge.recurring import generate_occurrences
 
 
 def _setup_db(tmp_path):
@@ -15,16 +21,17 @@ def _setup_db(tmp_path):
 
 
 def _insert_recurring(conn, desc, amount, start_date, interval_days, count):
-    from datetime import datetime, timedelta as td
+    from datetime import datetime
+    from datetime import timedelta as td
+
     dt = datetime.strptime(start_date, "%Y-%m-%d")
     for i in range(count):
         posted = (dt + td(days=interval_days * i)).strftime("%Y-%m-%d")
-        upsert_transaction(
-            conn, f"txn-{desc}-{i}", "acct-1", posted, amount, desc
-        )
+        upsert_transaction(conn, f"txn-{desc}-{i}", "acct-1", posted, amount, desc)
 
 
 # --- generate_occurrences tests ---
+
 
 def test_generate_occurrences_monthly():
     today = date.today()
@@ -72,6 +79,7 @@ def test_generate_occurrences_empty_window():
 
 
 # --- project_balances tests ---
+
 
 def test_project_balances_basic(tmp_path):
     conn = _setup_db(tmp_path)

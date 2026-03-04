@@ -4,18 +4,25 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll, Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import DataTable, Static
 
-from simledge.analysis import monthly_summary, spending_by_category_grouped, recent_transactions, income_by_category, yoy_comparison, ytd_comparison
+from simledge.analysis import (
+    income_by_category,
+    monthly_summary,
+    recent_transactions,
+    spending_by_category_grouped,
+    yoy_comparison,
+    ytd_comparison,
+)
 from simledge.budget import budget_vs_actual, total_budget_summary
 from simledge.config import DB_PATH
+from simledge.db import get_last_sync, init_db
 from simledge.goals import all_goals_progress
-from simledge.watchlist import get_watchlists, all_watchlist_spending
-from simledge.db import init_db, get_last_sync
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
+from simledge.watchlist import all_watchlist_spending, get_watchlists
 
 
 class OverviewScreen(Screen):
@@ -32,11 +39,26 @@ class OverviewScreen(Screen):
         with VerticalScroll():
             yield Vertical(Static("", id="summary-content"), id="summary-panel", classes="panel")
             yield Vertical(Static("", id="category-content"), id="category-panel", classes="panel")
-            yield Vertical(Static("", id="budget-overview-content"), id="budget-overview-panel", classes="panel")
+            yield Vertical(
+                Static("", id="budget-overview-content"),
+                id="budget-overview-panel",
+                classes="panel",
+            )
             yield Vertical(Static("", id="yoy-content"), id="yoy-panel", classes="panel")
-            yield Vertical(Static("", id="goals-overview-content"), id="goals-overview-panel", classes="panel")
-            yield Vertical(Static("", id="watchlist-overview-content"), id="watchlist-overview-panel", classes="panel")
-            yield Vertical(DataTable(id="recent-table"), Static("", id="sync-status"), id="recent-panel", classes="panel")
+            yield Vertical(
+                Static("", id="goals-overview-content"), id="goals-overview-panel", classes="panel"
+            )
+            yield Vertical(
+                Static("", id="watchlist-overview-content"),
+                id="watchlist-overview-panel",
+                classes="panel",
+            )
+            yield Vertical(
+                DataTable(id="recent-table"),
+                Static("", id="sync-status"),
+                id="recent-panel",
+                classes="panel",
+            )
 
     def on_mount(self):
         self._month = datetime.now().strftime("%Y-%m")
@@ -80,12 +102,16 @@ class OverviewScreen(Screen):
         categories = spending_by_category_grouped(conn, month, account_ids=account_ids)
         inc_cats = income_by_category(conn, month, account_ids=account_ids)
         budget_items = budget_vs_actual(conn, month, account_ids=account_ids)
-        budget_summary = total_budget_summary(conn, month, account_ids=account_ids) if budget_items else None
+        budget_summary = (
+            total_budget_summary(conn, month, account_ids=account_ids) if budget_items else None
+        )
         yoy = yoy_comparison(conn, month, account_ids=account_ids)
         ytd = ytd_comparison(conn, account_ids=account_ids)
         goals_progress = all_goals_progress(conn)
         watchlists_exist = bool(get_watchlists(conn))
-        wl_items = all_watchlist_spending(conn, month, account_ids=account_ids) if watchlists_exist else []
+        wl_items = (
+            all_watchlist_spending(conn, month, account_ids=account_ids) if watchlists_exist else []
+        )
         recent = recent_transactions(conn, limit=10, account_ids=account_ids)
         last_sync = get_last_sync(conn)
         txn_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
@@ -119,7 +145,9 @@ class OverviewScreen(Screen):
         # Category bars (hierarchical)
         if categories:
             total_spend = sum(abs(c["total"]) for c in categories)
-            max_pct = max((abs(c["total"]) / total_spend * 100) if total_spend else 0 for c in categories)
+            max_pct = max(
+                (abs(c["total"]) / total_spend * 100) if total_spend else 0 for c in categories
+            )
             bar_width = 25
             bar_char = "\u2588"
             empty_char = "\u2591"
@@ -131,17 +159,23 @@ class OverviewScreen(Screen):
                 pct = (amt / total_spend * 100) if total_spend else 0
                 filled = int(bar_width * (pct / max_pct)) if max_pct > 0 else 0
                 bar = f"[#2dd4bf]{bar_char * filled}[/][#333]{empty_char * (bar_width - filled)}[/]"
-                lines.append(f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
+                lines.append(
+                    f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
+                )
                 for child in c.get("children", []):
                     child_name = child["category"].split(":", 1)[1]
                     child_amt = abs(child["total"])
                     child_pct = (child_amt / total_spend * 100) if total_spend else 0
                     child_filled = int(bar_width * (child_pct / max_pct)) if max_pct > 0 else 0
                     child_bar = f"[#1a9985]{bar_char * child_filled}[/][#333]{empty_char * (bar_width - child_filled)}[/]"
-                    lines.append(f"  {child_name:<16} [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]")
+                    lines.append(
+                        f"  {child_name:<16} [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]"
+                    )
             self.query_one("#category-content", Static).update("\n".join(lines))
         else:
-            self.query_one("#category-content", Static).update("[dim]No spending data this month[/]")
+            self.query_one("#category-content", Static).update(
+                "[dim]No spending data this month[/]"
+            )
 
         # Budget overview (only if budgets exist)
         budget_panel = self.query_one("#budget-overview-panel")
@@ -171,7 +205,9 @@ class OverviewScreen(Screen):
             pace = budget_summary["daily_pace"] if budget_summary["days_remaining"] > 0 else 0
             remaining = budget_summary["total_remaining"]
             rem_color = "#22c55e" if remaining >= 0 else "#ef4444"
-            blines.append(f"\n[{rem_color}]{format_dollar(remaining, signed=True, masked=m)} remaining[/] \u00b7 {format_dollar(pace, masked=m)}/day pace")
+            blines.append(
+                f"\n[{rem_color}]{format_dollar(remaining, signed=True, masked=m)} remaining[/] \u00b7 {format_dollar(pace, masked=m)}/day pace"
+            )
             self.query_one("#budget-overview-content", Static).update("\n".join(blines))
         else:
             budget_panel.display = False

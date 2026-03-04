@@ -1,8 +1,9 @@
 # tests/test_categorize.py
 
+
 def test_apply_rules_matches_keyword(tmp_path):
-    from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
     from simledge.categorize import add_rule, apply_rules
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Bank", None)
@@ -23,8 +24,8 @@ def test_apply_rules_matches_keyword(tmp_path):
 
 
 def test_apply_rules_respects_priority(tmp_path):
-    from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
     from simledge.categorize import add_rule, apply_rules
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Bank", None)
@@ -41,14 +42,15 @@ def test_apply_rules_respects_priority(tmp_path):
 
 
 def test_apply_rules_skips_already_categorized(tmp_path):
-    from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
     from simledge.categorize import add_rule, apply_rules
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Bank", None)
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-    upsert_transaction(conn, "txn-1", "acct-1", "2026-03-01", -47.32, "WHOLE FOODS",
-                       category="food")
+    upsert_transaction(
+        conn, "txn-1", "acct-1", "2026-03-01", -47.32, "WHOLE FOODS", category="food"
+    )
 
     add_rule(conn, "WHOLE FOODS", "groceries")
     count = apply_rules(conn)
@@ -60,8 +62,8 @@ def test_apply_rules_skips_already_categorized(tmp_path):
 
 
 def test_list_rules(tmp_path):
-    from simledge.db import init_db
     from simledge.categorize import add_rule, list_rules
+    from simledge.db import init_db
 
     conn = init_db(str(tmp_path / "test.db"))
     add_rule(conn, "AMAZON", "shopping", priority=0)

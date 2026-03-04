@@ -4,14 +4,20 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll, Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Static
 
-from simledge.analysis import spending_trend, spending_by_category_grouped, income_trend, income_by_category, yoy_comparison
+from simledge.analysis import (
+    income_by_category,
+    income_trend,
+    spending_by_category_grouped,
+    spending_trend,
+    yoy_comparison,
+)
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.tui.charts import render_bar_chart, TEAL, GREEN
+from simledge.tui.charts import GREEN, TEAL, render_bar_chart
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -27,11 +33,15 @@ class TrendsScreen(Screen):
         with VerticalScroll():
             with Vertical(id="chart-panel", classes="panel"):
                 yield Static("", id="spending-chart")
-            yield Vertical(Static("", id="comparison-content"), id="comparison-panel", classes="panel")
+            yield Vertical(
+                Static("", id="comparison-content"), id="comparison-panel", classes="panel"
+            )
             with Vertical(id="income-panel", classes="panel"):
                 yield Static("", id="income-chart")
                 yield Static("", id="income-sources")
-            yield Vertical(Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel")
+            yield Vertical(
+                Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel"
+            )
 
     def on_mount(self):
         self._lookback = 6
@@ -101,7 +111,9 @@ class TrendsScreen(Screen):
                         f"{cat:<18} [bold]{format_dollar(abs(prev), masked=m):>10}[/] → [bold]{format_dollar(abs(cur), masked=m):>10}[/]  [{color}]{arrow} {abs(change):.0f}%[/]"
                     )
                 else:
-                    lines.append(f"{cat:<18} {'':>11} → [bold]{format_dollar(abs(cur), masked=m):>10}[/]  [dim]new[/]")
+                    lines.append(
+                        f"{cat:<18} {'':>11} → [bold]{format_dollar(abs(cur), masked=m):>10}[/]  [dim]new[/]"
+                    )
 
         if not lines:
             lines.append("[dim]No comparison data yet. Run: simledge sync[/]")
@@ -130,7 +142,9 @@ class TrendsScreen(Screen):
                 bar_width = 25
                 filled = int(bar_width * (amt / max_total)) if max_total > 0 else 0
                 bar = f"[#22c55e]{chr(0x2588) * filled}[/][#333]{chr(0x2591) * (bar_width - filled)}[/]"
-                src_lines.append(f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
+                src_lines.append(
+                    f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
+                )
             self.query_one("#income-sources", Static).update("\n".join(src_lines))
         else:
             self.query_one("#income-sources", Static).update("[dim]No income this month[/]")
@@ -151,9 +165,13 @@ class TrendsScreen(Screen):
                 total_cur += cur
                 total_prev += prev
                 if c["previous"] == 0:
-                    ylines.append(f"{c['category']:<14} {'':>7} \u2192 {format_dollar(cur, masked=m):>10}   [dim]new[/]")
+                    ylines.append(
+                        f"{c['category']:<14} {'':>7} \u2192 {format_dollar(cur, masked=m):>10}   [dim]new[/]"
+                    )
                 elif c["current"] == 0:
-                    ylines.append(f"{c['category']:<14} {format_dollar(prev, masked=m):>8} \u2192 {'':>10}   [dim]gone[/]")
+                    ylines.append(
+                        f"{c['category']:<14} {format_dollar(prev, masked=m):>8} \u2192 {'':>10}   [dim]gone[/]"
+                    )
                 elif c["change_pct"] is not None:
                     pct = c["change_pct"]
                     if pct < 0:

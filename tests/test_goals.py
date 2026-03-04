@@ -2,7 +2,8 @@
 
 
 def _setup_db(tmp_path):
-    from simledge.db import init_db, upsert_institution, upsert_account, snapshot_balance
+    from simledge.db import init_db, snapshot_balance, upsert_account, upsert_institution
+
     db_path = str(tmp_path / "test.db")
     conn = init_db(db_path)
     upsert_institution(conn, "bank-1", "Test Bank", "test.com")
@@ -13,8 +14,9 @@ def _setup_db(tmp_path):
 
 def test_create_goal_basic(tmp_path):
     from simledge.goals import create_goal, get_goals
+
     conn = _setup_db(tmp_path)
-    goal_id = create_goal(conn, "Emergency Fund", 10000.00)
+    create_goal(conn, "Emergency Fund", 10000.00)
     goals = get_goals(conn)
     assert len(goals) == 1
     assert goals[0]["name"] == "Emergency Fund"
@@ -26,8 +28,9 @@ def test_create_goal_basic(tmp_path):
 
 def test_create_goal_with_account(tmp_path):
     from simledge.goals import create_goal, get_goals
+
     conn = _setup_db(tmp_path)
-    goal_id = create_goal(conn, "Vacation", 5000.00, account_id="acct-1")
+    create_goal(conn, "Vacation", 5000.00, account_id="acct-1")
     goals = get_goals(conn)
     assert len(goals) == 1
     assert goals[0]["account_id"] == "acct-1"
@@ -38,6 +41,7 @@ def test_create_goal_with_account(tmp_path):
 def test_goal_progress_linked(tmp_path):
     from simledge.db import snapshot_balance
     from simledge.goals import create_goal, goal_progress
+
     conn = _setup_db(tmp_path)
     goal_id = create_goal(conn, "Vacation", 5000.00, account_id="acct-1")
     # Simulate balance growth
@@ -52,6 +56,7 @@ def test_goal_progress_linked(tmp_path):
 
 def test_goal_progress_no_account(tmp_path):
     from simledge.goals import create_goal, goal_progress
+
     conn = _setup_db(tmp_path)
     goal_id = create_goal(conn, "Emergency Fund", 10000.00)
     p = goal_progress(conn, goal_id)
@@ -63,6 +68,7 @@ def test_goal_progress_no_account(tmp_path):
 
 def test_goal_monthly_needed(tmp_path):
     from simledge.goals import create_goal, goal_progress
+
     conn = _setup_db(tmp_path)
     goal_id = create_goal(conn, "Car", 20000.00, target_date="2027-03-03")
     p = goal_progress(conn, goal_id)
@@ -73,6 +79,7 @@ def test_goal_monthly_needed(tmp_path):
 
 def test_goal_monthly_needed_past_date(tmp_path):
     from simledge.goals import create_goal, goal_progress
+
     conn = _setup_db(tmp_path)
     goal_id = create_goal(conn, "Old Goal", 5000.00, target_date="2024-01-01")
     p = goal_progress(conn, goal_id)
@@ -82,6 +89,7 @@ def test_goal_monthly_needed_past_date(tmp_path):
 
 def test_delete_goal(tmp_path):
     from simledge.goals import create_goal, delete_goal, get_goals
+
     conn = _setup_db(tmp_path)
     goal_id = create_goal(conn, "Test Goal", 1000.00)
     assert len(get_goals(conn)) == 1
@@ -91,7 +99,8 @@ def test_delete_goal(tmp_path):
 
 
 def test_update_goal(tmp_path):
-    from simledge.goals import create_goal, update_goal, get_goals
+    from simledge.goals import create_goal, get_goals, update_goal
+
     conn = _setup_db(tmp_path)
     goal_id = create_goal(conn, "Test Goal", 1000.00)
     update_goal(conn, goal_id, target_amount=2000.00)

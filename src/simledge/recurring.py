@@ -15,9 +15,9 @@ def _normalize_description(desc):
     if not desc:
         return ""
     s = desc.lower().strip()
-    s = re.sub(r'\s+', ' ', s)
+    s = re.sub(r"\s+", " ", s)
     # Strip trailing transaction IDs / reference numbers (e.g. "#12345", "00839")
-    s = re.sub(r'\s*#?\d{3,}$', '', s)
+    s = re.sub(r"\s*#?\d{3,}$", "", s)
     return s.strip()
 
 
@@ -32,8 +32,7 @@ def _classify_frequency(avg_days):
     return None
 
 
-def detect_recurring(conn, min_occurrences=3, tolerance_days=5,
-                     tolerance_amount=0.10):
+def detect_recurring(conn, min_occurrences=3, tolerance_days=5, tolerance_amount=0.10):
     """Detect recurring transactions from the database.
 
     Returns list of dicts with: description, category, frequency,
@@ -53,16 +52,18 @@ def detect_recurring(conn, min_occurrences=3, tolerance_days=5,
         key = _normalize_description(desc)
         if not key:
             continue
-        groups.setdefault(key, []).append({
-            "posted": posted,
-            "amount": amount,
-            "description": desc,
-            "category": category,
-            "account": account,
-        })
+        groups.setdefault(key, []).append(
+            {
+                "posted": posted,
+                "amount": amount,
+                "description": desc,
+                "category": category,
+                "account": account,
+            }
+        )
 
     results = []
-    for key, txns in groups.items():
+    for _key, txns in groups.items():
         if len(txns) < min_occurrences:
             continue
 
@@ -111,18 +112,20 @@ def detect_recurring(conn, min_occurrences=3, tolerance_days=5,
         last_dt, last_txn = dated[-1]
         next_expected = last_dt + timedelta(days=round(avg_interval))
 
-        results.append({
-            "description": last_txn["description"],
-            "category": last_txn["category"],
-            "frequency": frequency,
-            "avg_amount": last_txn["amount"],
-            "last_amount": last_txn["amount"],
-            "last_date": last_txn["posted"][:10],
-            "next_expected": next_expected.strftime("%Y-%m-%d"),
-            "occurrence_count": len(dated),
-            "is_fixed_amount": is_fixed,
-            "account": last_txn["account"],
-        })
+        results.append(
+            {
+                "description": last_txn["description"],
+                "category": last_txn["category"],
+                "frequency": frequency,
+                "avg_amount": last_txn["amount"],
+                "last_amount": last_txn["amount"],
+                "last_date": last_txn["posted"][:10],
+                "next_expected": next_expected.strftime("%Y-%m-%d"),
+                "occurrence_count": len(dated),
+                "is_fixed_amount": is_fixed,
+                "account": last_txn["account"],
+            }
+        )
 
     # Sort by next_expected
     results.sort(key=lambda r: r["next_expected"])
@@ -158,12 +161,14 @@ def generate_occurrences(recurring_item, start_date, end_date):
 
     occurrences = []
     while cursor <= end_date:
-        occurrences.append({
-            "date": cursor.strftime("%Y-%m-%d"),
-            "amount": recurring_item.get("last_amount", 0),
-            "description": recurring_item.get("description", ""),
-            "account": recurring_item.get("account", ""),
-        })
+        occurrences.append(
+            {
+                "date": cursor.strftime("%Y-%m-%d"),
+                "amount": recurring_item.get("last_amount", 0),
+                "description": recurring_item.get("description", ""),
+                "account": recurring_item.get("account", ""),
+            }
+        )
         cursor += timedelta(days=interval)
 
     return occurrences
@@ -226,9 +231,7 @@ def calendar_bills(conn, month):
         occs = generate_occurrences(item, month_start, month_end)
         for occ in occs:
             occ_date = datetime.strptime(occ["date"], "%Y-%m-%d").date()
-            paid_info = check_bill_paid(
-                conn, occ["description"], occ["amount"], occ_date
-            )
+            paid_info = check_bill_paid(conn, occ["description"], occ["amount"], occ_date)
 
             if paid_info["paid"]:
                 status = "paid"
@@ -237,16 +240,18 @@ def calendar_bills(conn, month):
             else:
                 status = "upcoming"
 
-            results.append({
-                "date": occ["date"],
-                "day": occ_date.day,
-                "weekday": occ_date.weekday(),
-                "description": occ["description"],
-                "expected_amount": occ["amount"],
-                "status": status,
-                "actual_amount": paid_info["actual_amount"],
-                "account": occ["account"],
-            })
+            results.append(
+                {
+                    "date": occ["date"],
+                    "day": occ_date.day,
+                    "weekday": occ_date.weekday(),
+                    "description": occ["description"],
+                    "expected_amount": occ["amount"],
+                    "status": status,
+                    "actual_amount": paid_info["actual_amount"],
+                    "account": occ["account"],
+                }
+            )
 
     results.sort(key=lambda r: r["date"])
     return results

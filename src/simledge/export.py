@@ -4,7 +4,7 @@ import csv
 import io
 import json
 
-from simledge.analysis import spending_by_category, monthly_summary
+from simledge.analysis import monthly_summary, spending_by_category
 
 
 def _get_transactions(conn, month):
@@ -16,8 +16,10 @@ def _get_transactions(conn, month):
         " ORDER BY t.posted DESC",
         (month,),
     ).fetchall()
-    return [{"date": r[0], "description": r[1], "category": r[2],
-             "amount": r[3], "account": r[4]} for r in rows]
+    return [
+        {"date": r[0], "description": r[1], "category": r[2], "amount": r[3], "account": r[4]}
+        for r in rows
+    ]
 
 
 def export_markdown(conn, month):
@@ -48,8 +50,10 @@ def export_markdown(conn, month):
     lines.append("| Date | Description | Category | Amount | Account |")
     lines.append("| --- | --- | --- | --- | --- |")
     for t in transactions:
-        lines.append(f"| {t['date']} | {t['description']} | {t['category']}"
-                     f" | ${t['amount']:+,.2f} | {t['account']} |")
+        lines.append(
+            f"| {t['date']} | {t['description']} | {t['category']}"
+            f" | ${t['amount']:+,.2f} | {t['account']} |"
+        )
 
     return "\n".join(lines)
 
@@ -57,7 +61,9 @@ def export_markdown(conn, month):
 def export_csv(conn, month):
     transactions = _get_transactions(conn, month)
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=["date", "description", "category", "amount", "account"])
+    writer = csv.DictWriter(
+        output, fieldnames=["date", "description", "category", "amount", "account"]
+    )
     writer.writeheader()
     writer.writerows(transactions)
     return output.getvalue()
@@ -67,9 +73,12 @@ def export_json(conn, month):
     summary = monthly_summary(conn, month)
     categories = spending_by_category(conn, month)
     transactions = _get_transactions(conn, month)
-    return json.dumps({
-        "month": month,
-        "summary": summary,
-        "categories": categories,
-        "transactions": transactions,
-    }, indent=2)
+    return json.dumps(
+        {
+            "month": month,
+            "summary": summary,
+            "categories": categories,
+            "transactions": transactions,
+        },
+        indent=2,
+    )

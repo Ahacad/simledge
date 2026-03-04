@@ -1,8 +1,8 @@
 # tests/test_calendar.py
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 
-from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
-from simledge.recurring import check_bill_paid, calendar_bills
+from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+from simledge.recurring import calendar_bills, check_bill_paid
 
 
 def _setup_db(tmp_path):
@@ -17,9 +17,7 @@ def _insert_recurring(conn, desc, amount, start_date, interval_days, count):
     dt = datetime.strptime(start_date, "%Y-%m-%d")
     for i in range(count):
         posted = (dt + timedelta(days=interval_days * i)).strftime("%Y-%m-%d")
-        upsert_transaction(
-            conn, f"txn-{desc}-{i}", "acct-1", posted, amount, desc
-        )
+        upsert_transaction(conn, f"txn-{desc}-{i}", "acct-1", posted, amount, desc)
 
 
 def test_check_bill_paid_found(tmp_path):

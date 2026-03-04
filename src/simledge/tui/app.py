@@ -8,20 +8,19 @@ from textual.widgets import Checkbox, Static
 
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
-from simledge.tui.formatting import format_dollar
-from simledge.db import init_db, get_last_sync
+from simledge.db import get_last_sync, init_db
 from simledge.sync import run_sync
-from simledge.tui.screens.overview import OverviewScreen
-from simledge.tui.screens.transactions import TransactionsScreen
+from simledge.tui.formatting import format_dollar
 from simledge.tui.screens.accounts import AccountsScreen
-from simledge.tui.screens.trends import TrendsScreen
-from simledge.tui.screens.networth import NetWorthScreen
-from simledge.tui.screens.rules import RulesScreen
-from simledge.tui.screens.recurring import RecurringScreen
 from simledge.tui.screens.budget import BudgetScreen
 from simledge.tui.screens.goals import GoalsScreen
+from simledge.tui.screens.networth import NetWorthScreen
+from simledge.tui.screens.overview import OverviewScreen
+from simledge.tui.screens.recurring import RecurringScreen
+from simledge.tui.screens.rules import RulesScreen
+from simledge.tui.screens.transactions import TransactionsScreen
+from simledge.tui.screens.trends import TrendsScreen
 from simledge.tui.screens.watchlist import WatchlistScreen
-
 
 HELP_TEXT = """\
 [bold]SimpLedge Keyboard Shortcuts[/]
@@ -69,9 +68,8 @@ class HelpScreen(ModalScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        with Middle():
-            with Center():
-                yield Static(HELP_TEXT, id="help-box")
+        with Middle(), Center():
+            yield Static(HELP_TEXT, id="help-box")
 
 
 class AccountFilterModal(ModalScreen):
@@ -81,11 +79,12 @@ class AccountFilterModal(ModalScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        with Middle():
-            with Center():
-                with Vertical(id="filter-box"):
-                    yield Static("[bold]Filter Accounts[/]\n[dim]Space: toggle  Enter: apply  Esc: cancel[/]", id="filter-header")
-                    yield VerticalScroll(id="filter-list")
+        with Middle(), Center(), Vertical(id="filter-box"):
+            yield Static(
+                "[bold]Filter Accounts[/]\n[dim]Space: toggle  Enter: apply  Esc: cancel[/]",
+                id="filter-header",
+            )
+            yield VerticalScroll(id="filter-list")
 
     def on_mount(self):
         conn = init_db(DB_PATH)
@@ -178,6 +177,7 @@ class SimpLedgeApp(App):
     def _maybe_auto_sync(self):
         """Auto-sync if last successful sync was > 24h ago."""
         from datetime import datetime, timedelta
+
         conn = init_db(DB_PATH)
         last = get_last_sync(conn)
         conn.close()
@@ -211,7 +211,9 @@ class SimpLedgeApp(App):
     async def _do_sync(self):
         result = await run_sync(quiet=True)
         if result["status"] == "success":
-            self.notify(f"Synced {result['accounts']} accounts, {result['transactions']} transactions")
+            self.notify(
+                f"Synced {result['accounts']} accounts, {result['transactions']} transactions"
+            )
         else:
             self.notify(result["status"], severity="error")
         if hasattr(self.screen, "_refresh_data"):

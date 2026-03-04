@@ -33,8 +33,7 @@ def tag_transaction(conn, txn_id, tag_name):
     """Tag a transaction. Idempotent."""
     tag_id = get_or_create_tag(conn, tag_name)
     conn.execute(
-        "INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id)"
-        " VALUES (?, ?)",
+        "INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)",
         (txn_id, tag_id),
     )
     conn.commit()
@@ -67,16 +66,13 @@ def get_transaction_tags(conn, txn_id):
 
 def set_transaction_tags(conn, txn_id, tag_names):
     """Replace all tags on a transaction."""
-    conn.execute(
-        "DELETE FROM transaction_tags WHERE transaction_id = ?", (txn_id,)
-    )
+    conn.execute("DELETE FROM transaction_tags WHERE transaction_id = ?", (txn_id,))
     for name in tag_names:
         name = name.strip()
         if name:
             tag_id = get_or_create_tag(conn, name)
             conn.execute(
-                "INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id)"
-                " VALUES (?, ?)",
+                "INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)",
                 (txn_id, tag_id),
             )
     conn.commit()

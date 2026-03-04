@@ -14,14 +14,16 @@ def _dollar_yticks(values):
         return
     max_val = max(abs(v) for v in values)
     min_val = min(values)
-    if max_val >= 1_000_000:
-        fmt = lambda v: f"${v / 1_000_000:.1f}M"
-    elif max_val >= 10_000:
-        fmt = lambda v: f"${v / 1_000:.0f}k"
-    elif max_val >= 1_000:
-        fmt = lambda v: f"${v / 1_000:.1f}k"
-    else:
-        fmt = lambda v: f"${v:,.0f}"
+
+    def fmt(v):
+        if max_val >= 1_000_000:
+            return f"${v / 1_000_000:.1f}M"
+        elif max_val >= 10_000:
+            return f"${v / 1_000:.0f}k"
+        elif max_val >= 1_000:
+            return f"${v / 1_000:.1f}k"
+        return f"${v:,.0f}"
+
     span = max_val - min_val
     if span == 0:
         plt.yticks([max_val], [fmt(max_val)])

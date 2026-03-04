@@ -4,13 +4,16 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, Center, Middle
-from textual.screen import Screen, ModalScreen
+from textual.containers import Center, Middle, Vertical
+from textual.screen import ModalScreen, Screen
 from textual.widgets import DataTable, Input, Static
 
 from simledge.budget import (
-    get_budgets, set_budget, delete_budget,
-    budget_vs_actual, total_budget_summary,
+    budget_vs_actual,
+    delete_budget,
+    get_budgets,
+    set_budget,
+    total_budget_summary,
 )
 from simledge.config import DB_PATH
 from simledge.db import init_db
@@ -31,26 +34,24 @@ class BudgetModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         title = "Edit Budget" if self._budget else "New Budget"
-        with Middle():
-            with Center():
-                with Vertical(id="budget-modal-box"):
-                    yield Static(f"[bold]{title}[/]", id="budget-modal-title")
-                    yield Input(
-                        placeholder="Category",
-                        value=self._budget["category"] if self._budget else "",
-                        id="budget-category",
-                        disabled=bool(self._budget),
-                    )
-                    yield Input(
-                        placeholder="Monthly limit",
-                        value=str(self._budget["budget"]) if self._budget else "",
-                        id="budget-amount",
-                    )
-                    yield Static(
-                        "[dim]Category: max 100 chars  |  Amount: positive number\n"
-                        "Enter: save  Esc: cancel[/]",
-                        id="budget-modal-hint",
-                    )
+        with Middle(), Center(), Vertical(id="budget-modal-box"):
+            yield Static(f"[bold]{title}[/]", id="budget-modal-title")
+            yield Input(
+                placeholder="Category",
+                value=self._budget["category"] if self._budget else "",
+                id="budget-category",
+                disabled=bool(self._budget),
+            )
+            yield Input(
+                placeholder="Monthly limit",
+                value=str(self._budget["budget"]) if self._budget else "",
+                id="budget-amount",
+            )
+            yield Static(
+                "[dim]Category: max 100 chars  |  Amount: positive number\n"
+                "Enter: save  Esc: cancel[/]",
+                id="budget-modal-hint",
+            )
 
     def on_mount(self):
         if self._budget:
@@ -179,9 +180,15 @@ class BudgetScreen(Screen):
         budget_ids = {b["category"].lower(): b["id"] for b in budgets}
 
         # Summary panel
-        self.query_one("#budget-summary-panel").border_title = f"Budget Summary \u2014 {month_display}"
+        self.query_one(
+            "#budget-summary-panel"
+        ).border_title = f"Budget Summary \u2014 {month_display}"
         remaining_color = "#22c55e" if summary["total_remaining"] >= 0 else "#ef4444"
-        pace_text = f"{format_dollar(summary['daily_pace'], masked=m)}/day" if summary["days_remaining"] > 0 else "month ended"
+        pace_text = (
+            f"{format_dollar(summary['daily_pace'], masked=m)}/day"
+            if summary["days_remaining"] > 0
+            else "month ended"
+        )
         summary_text = (
             f"[bold]Budgeted:[/] {format_dollar(summary['total_budgeted'], masked=m)}"
             f"    [bold]Spent:[/] [#ef4444]{format_dollar(summary['total_actual'], masked=m)}[/]"
@@ -211,10 +218,13 @@ class BudgetScreen(Screen):
             )
 
         budget_count = len(items)
-        status_pace = f"{format_dollar(summary['daily_pace'], masked=m)}/day remaining" if summary["days_remaining"] > 0 else "month ended"
+        status_pace = (
+            f"{format_dollar(summary['daily_pace'], masked=m)}/day remaining"
+            if summary["days_remaining"] > 0
+            else "month ended"
+        )
         self.query_one("#budget-status", Static).update(
-            f"[dim]{budget_count} budgets  |  {status_pace}  |"
-            f"  n: new  d: delete  Enter: edit[/]"
+            f"[dim]{budget_count} budgets  |  {status_pace}  |  n: new  d: delete  Enter: edit[/]"
         )
 
     def _get_selected_budget(self):
@@ -244,7 +254,7 @@ class BudgetScreen(Screen):
         if table.row_count == 0:
             self.app.notify("No budget selected", severity="warning")
             return
-        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+        _row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
         # Find the budget data from table row
         conn = init_db(DB_PATH)
         items = budget_vs_actual(conn, self._month, account_ids=self.app.active_account_ids)

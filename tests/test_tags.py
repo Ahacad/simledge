@@ -1,19 +1,24 @@
 # tests/test_tags.py
-from simledge.db import init_db, upsert_institution, upsert_account, upsert_transaction
+from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
 
 def _seed_db(tmp_path):
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Test Bank", "test.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -50.00, "TEST_STORE", category="shopping")
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -50.00, "TEST_STORE", category="shopping"
+    )
     upsert_transaction(conn, "t2", "acct-1", "2026-03-02", -30.00, "TEST_GAS", category="gas")
-    upsert_transaction(conn, "t3", "acct-1", "2026-03-03", -80.00, "TEST_FOOD", category="groceries")
+    upsert_transaction(
+        conn, "t3", "acct-1", "2026-03-03", -80.00, "TEST_FOOD", category="groceries"
+    )
     return conn
 
 
 def test_create_tag(tmp_path):
     from simledge.tags import create_tag, list_tags
+
     conn = _seed_db(tmp_path)
     tag_id = create_tag(conn, "vacation")
     assert tag_id is not None
@@ -24,6 +29,7 @@ def test_create_tag(tmp_path):
 
 def test_get_or_create_tag(tmp_path):
     from simledge.tags import get_or_create_tag
+
     conn = _seed_db(tmp_path)
     id1 = get_or_create_tag(conn, "trip")
     id2 = get_or_create_tag(conn, "trip")
@@ -32,7 +38,8 @@ def test_get_or_create_tag(tmp_path):
 
 
 def test_tag_transaction(tmp_path):
-    from simledge.tags import tag_transaction, get_transaction_tags
+    from simledge.tags import get_transaction_tags, tag_transaction
+
     conn = _seed_db(tmp_path)
     tag_transaction(conn, "t1", "vancouver")
     tags = get_transaction_tags(conn, "t1")
@@ -45,7 +52,8 @@ def test_tag_transaction(tmp_path):
 
 
 def test_untag_transaction(tmp_path):
-    from simledge.tags import tag_transaction, untag_transaction, get_transaction_tags
+    from simledge.tags import get_transaction_tags, tag_transaction, untag_transaction
+
     conn = _seed_db(tmp_path)
     tag_transaction(conn, "t1", "ski-trip")
     untag_transaction(conn, "t1", "ski-trip")
@@ -55,7 +63,8 @@ def test_untag_transaction(tmp_path):
 
 
 def test_get_transaction_tags(tmp_path):
-    from simledge.tags import tag_transaction, get_transaction_tags
+    from simledge.tags import get_transaction_tags, tag_transaction
+
     conn = _seed_db(tmp_path)
     tag_transaction(conn, "t1", "travel")
     tag_transaction(conn, "t1", "food")
@@ -67,7 +76,8 @@ def test_get_transaction_tags(tmp_path):
 
 
 def test_set_transaction_tags(tmp_path):
-    from simledge.tags import tag_transaction, set_transaction_tags, get_transaction_tags
+    from simledge.tags import get_transaction_tags, set_transaction_tags, tag_transaction
+
     conn = _seed_db(tmp_path)
     tag_transaction(conn, "t1", "old-tag")
     set_transaction_tags(conn, "t1", ["new-a", "new-b"])
@@ -78,8 +88,9 @@ def test_set_transaction_tags(tmp_path):
 
 
 def test_spending_by_tag(tmp_path):
-    from simledge.tags import tag_transaction
     from simledge.analysis import spending_by_tag
+    from simledge.tags import tag_transaction
+
     conn = _seed_db(tmp_path)
     tag_transaction(conn, "t1", "vancouver")
     tag_transaction(conn, "t2", "vancouver")
@@ -91,8 +102,9 @@ def test_spending_by_tag(tmp_path):
 
 
 def test_spending_by_tag_multi(tmp_path):
-    from simledge.tags import tag_transaction
     from simledge.analysis import spending_by_tag
+    from simledge.tags import tag_transaction
+
     conn = _seed_db(tmp_path)
     # t1 tagged with both "trip" and "weekend"
     tag_transaction(conn, "t1", "trip")

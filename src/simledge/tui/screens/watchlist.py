@@ -4,18 +4,21 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll, Center, Middle
-from textual.screen import Screen, ModalScreen
+from textual.containers import Center, Middle, Vertical, VerticalScroll
+from textual.screen import ModalScreen, Screen
 from textual.widgets import Input, Static
 
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.watchlist import (
-    create_watchlist, get_watchlists, update_watchlist,
-    delete_watchlist, all_watchlist_spending,
-)
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
+from simledge.watchlist import (
+    all_watchlist_spending,
+    create_watchlist,
+    delete_watchlist,
+    get_watchlists,
+    update_watchlist,
+)
 
 
 class WatchlistModal(ModalScreen):
@@ -30,41 +33,39 @@ class WatchlistModal(ModalScreen):
     def compose(self) -> ComposeResult:
         title = "Edit Watchlist" if self._watchlist else "New Watchlist"
         w = self._watchlist
-        with Middle():
-            with Center():
-                with Vertical(id="watchlist-modal-box"):
-                    yield Static(f"[bold]{title}[/]", id="watchlist-modal-title")
-                    yield Input(
-                        placeholder="Name",
-                        value=w["name"] if w else "",
-                        id="wl-name",
-                    )
-                    yield Input(
-                        placeholder="Monthly target (optional)",
-                        value=str(w["monthly_target"]) if w and w.get("monthly_target") else "",
-                        id="wl-target",
-                    )
-                    yield Input(
-                        placeholder="Filter category (e.g. Food:Coffee)",
-                        value=w.get("filter_category") or "" if w else "",
-                        id="wl-category",
-                    )
-                    yield Input(
-                        placeholder="Filter tag",
-                        value=w.get("filter_tag") or "" if w else "",
-                        id="wl-tag",
-                    )
-                    yield Input(
-                        placeholder="Filter description (e.g. %amazon%)",
-                        value=w.get("filter_description") or "" if w else "",
-                        id="wl-description",
-                    )
-                    yield Static(
-                        "[dim]At least one filter required. Use % for wildcards.\n"
-                        "Name: max 100 chars  |  Target: positive number (optional)\n"
-                        "Enter: save  Esc: cancel[/]",
-                        id="watchlist-modal-hint",
-                    )
+        with Middle(), Center(), Vertical(id="watchlist-modal-box"):
+            yield Static(f"[bold]{title}[/]", id="watchlist-modal-title")
+            yield Input(
+                placeholder="Name",
+                value=w["name"] if w else "",
+                id="wl-name",
+            )
+            yield Input(
+                placeholder="Monthly target (optional)",
+                value=str(w["monthly_target"]) if w and w.get("monthly_target") else "",
+                id="wl-target",
+            )
+            yield Input(
+                placeholder="Filter category (e.g. Food:Coffee)",
+                value=w.get("filter_category") or "" if w else "",
+                id="wl-category",
+            )
+            yield Input(
+                placeholder="Filter tag",
+                value=w.get("filter_tag") or "" if w else "",
+                id="wl-tag",
+            )
+            yield Input(
+                placeholder="Filter description (e.g. %amazon%)",
+                value=w.get("filter_description") or "" if w else "",
+                id="wl-description",
+            )
+            yield Static(
+                "[dim]At least one filter required. Use % for wildcards.\n"
+                "Name: max 100 chars  |  Target: positive number (optional)\n"
+                "Enter: save  Esc: cancel[/]",
+                id="watchlist-modal-hint",
+            )
 
     def on_mount(self):
         self.query_one("#wl-name", Input).focus()
@@ -214,9 +215,7 @@ class WatchlistScreen(Screen):
             self.query_one("#watchlist-cards-content", Static).update(
                 "[dim]No watchlists yet. Press n to create one.[/]"
             )
-            self.query_one("#watchlist-status", Static).update(
-                "[dim]0 watchlists  |  n: new[/]"
-            )
+            self.query_one("#watchlist-status", Static).update("[dim]0 watchlists  |  n: new[/]")
             return
 
         # Pre-fetch watchlist definitions for filter display
@@ -245,8 +244,7 @@ class WatchlistScreen(Screen):
                 lines.append(f"{_progress_bar(pct)}  {pct:.0f}%{warn}")
             else:
                 lines.append(
-                    f"[bold]{name}[/]"
-                    f"         {format_dollar(actual, masked=m)} (no target)"
+                    f"[bold]{name}[/]         {format_dollar(actual, masked=m)} (no target)"
                 )
 
             # Show active filters
@@ -264,9 +262,7 @@ class WatchlistScreen(Screen):
             lines.append(f"[dim]{txn_count} transactions \u00b7 {filter_str}[/]")
             lines.append("")
 
-        self.query_one("#watchlist-cards-content", Static).update(
-            "\n".join(lines).rstrip()
-        )
+        self.query_one("#watchlist-cards-content", Static).update("\n".join(lines).rstrip())
         self.query_one("#watchlist-status", Static).update(
             f"[dim]{total} watchlists | {on_track} on track | {over} over target"
             f"  |  n: new  d: delete  Enter: edit[/]"
@@ -281,7 +277,8 @@ class WatchlistScreen(Screen):
         conn = init_db(DB_PATH)
         if "id" in result:
             update_watchlist(
-                conn, result["id"],
+                conn,
+                result["id"],
                 name=result["name"],
                 monthly_target=result["monthly_target"],
                 filter_category=result["filter_category"],
@@ -291,7 +288,8 @@ class WatchlistScreen(Screen):
             self.app.notify(f"Watchlist updated: {result['name']}")
         else:
             create_watchlist(
-                conn, result["name"],
+                conn,
+                result["name"],
                 monthly_target=result["monthly_target"],
                 filter_category=result["filter_category"],
                 filter_tag=result["filter_tag"],

@@ -1,7 +1,7 @@
 """Watchlist CRUD and spending queries."""
 
-from datetime import date
 import calendar
+from datetime import date
 
 from simledge.analysis import _account_filter
 from simledge.log import setup_logging
@@ -9,8 +9,9 @@ from simledge.log import setup_logging
 log = setup_logging("simledge.watchlist")
 
 
-def create_watchlist(conn, name, monthly_target=None, filter_category=None,
-                     filter_tag=None, filter_description=None):
+def create_watchlist(
+    conn, name, monthly_target=None, filter_category=None, filter_tag=None, filter_description=None
+):
     if not any([filter_category, filter_tag, filter_description]):
         raise ValueError("at least one filter is required")
     conn.execute(
@@ -29,17 +30,20 @@ def get_watchlists(conn):
     ).fetchall()
     return [
         {
-            "id": r[0], "name": r[1], "monthly_target": r[2],
-            "filter_category": r[3], "filter_tag": r[4],
-            "filter_description": r[5], "created_at": r[6],
+            "id": r[0],
+            "name": r[1],
+            "monthly_target": r[2],
+            "filter_category": r[3],
+            "filter_tag": r[4],
+            "filter_description": r[5],
+            "created_at": r[6],
         }
         for r in rows
     ]
 
 
 def update_watchlist(conn, watchlist_id, **kwargs):
-    allowed = {"name", "monthly_target", "filter_category", "filter_tag",
-               "filter_description"}
+    allowed = {"name", "monthly_target", "filter_category", "filter_tag", "filter_description"}
     updates, params = [], []
     for key, val in kwargs.items():
         if key not in allowed:
@@ -49,9 +53,7 @@ def update_watchlist(conn, watchlist_id, **kwargs):
     if not updates:
         return
     params.append(watchlist_id)
-    conn.execute(
-        f"UPDATE watchlists SET {', '.join(updates)} WHERE id = ?", params
-    )
+    conn.execute(f"UPDATE watchlists SET {', '.join(updates)} WHERE id = ?", params)
     conn.commit()
 
 
@@ -77,7 +79,7 @@ def watchlist_spending(conn, watchlist_id, month, account_ids=None):
 
     acct_filt, acct_params = _account_filter(account_ids, table_prefix="t.")
     if acct_filt:
-        conditions.append(acct_filt.lstrip(" AND "))
+        conditions.append(acct_filt.removeprefix(" AND "))
         params.extend(acct_params)
 
     if fcat:
@@ -98,8 +100,7 @@ def watchlist_spending(conn, watchlist_id, month, account_ids=None):
 
     where = " AND ".join(conditions)
     result = conn.execute(
-        f"SELECT COALESCE(SUM(t.amount), 0), COUNT(*)"
-        f" FROM transactions t WHERE {where}",
+        f"SELECT COALESCE(SUM(t.amount), 0), COUNT(*) FROM transactions t WHERE {where}",
         params,
     ).fetchone()
 
@@ -119,10 +120,7 @@ def watchlist_spending(conn, watchlist_id, month, account_ids=None):
     else:
         days_elapsed = 0
 
-    if days_elapsed > 0:
-        projected = actual * (last_day / days_elapsed)
-    else:
-        projected = 0
+    projected = actual * (last_day / days_elapsed) if days_elapsed > 0 else 0
 
     remaining = (target - actual) if target is not None else None
     pct_used = (actual / target * 100) if target else None
@@ -143,7 +141,4 @@ def watchlist_spending(conn, watchlist_id, month, account_ids=None):
 
 def all_watchlist_spending(conn, month, account_ids=None):
     watchlists = get_watchlists(conn)
-    return [
-        watchlist_spending(conn, w["id"], month, account_ids=account_ids)
-        for w in watchlists
-    ]
+    return [watchlist_spending(conn, w["id"], month, account_ids=account_ids) for w in watchlists]

@@ -76,12 +76,14 @@ def project_balances(conn, days=90, account_ids=None):
     # Build per_account result
     per_account = []
     for name, info in acct_map.items():
-        per_account.append({
-            "account": name,
-            "account_id": info["id"],
-            "current_balance": info["balance"],
-            "daily": per_account_daily[name],
-        })
+        per_account.append(
+            {
+                "account": name,
+                "account_id": info["id"],
+                "current_balance": info["balance"],
+                "daily": per_account_daily[name],
+            }
+        )
 
     # Summary
     def balance_at_day(day_num):

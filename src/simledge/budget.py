@@ -1,7 +1,7 @@
 """Budget CRUD and budget-vs-actual comparison queries."""
 
-from datetime import datetime, date
 import calendar
+from datetime import date
 
 from simledge.analysis import _account_filter
 
@@ -39,7 +39,7 @@ def budget_vs_actual(conn, month, account_ids=None):
         + filt.replace("account_id", "t.account_id")
         + " GROUP BY b.category, b.monthly_limit"
         " ORDER BY actual DESC",
-        [month] + filt_params,
+        [month, *filt_params],
     ).fetchall()
     result = []
     for r in rows:
@@ -47,13 +47,15 @@ def budget_vs_actual(conn, month, account_ids=None):
         actual = r[2]
         remaining = budget - actual
         pct = (actual / budget * 100) if budget > 0 else 0
-        result.append({
-            "category": r[0],
-            "budget": budget,
-            "actual": actual,
-            "remaining": remaining,
-            "pct_used": round(pct, 1),
-        })
+        result.append(
+            {
+                "category": r[0],
+                "budget": budget,
+                "actual": actual,
+                "remaining": remaining,
+                "pct_used": round(pct, 1),
+            }
+        )
     return result
 
 
@@ -68,9 +70,8 @@ def total_budget_summary(conn, month, account_ids=None):
     filt, filt_params = _account_filter(account_ids)
     row = conn.execute(
         "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions"
-        " WHERE amount < 0 AND strftime('%Y-%m', posted) = ?"
-        + filt,
-        [month] + filt_params,
+        " WHERE amount < 0 AND strftime('%Y-%m', posted) = ?" + filt,
+        [month, *filt_params],
     ).fetchone()
     all_spending = row[0]
     unbudgeted_spending = all_spending - total_actual

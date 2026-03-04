@@ -11,8 +11,7 @@ def create_goal(conn, name, target_amount, target_date=None, account_id=None):
     starting_balance = 0
     if account_id:
         row = conn.execute(
-            "SELECT balance FROM balances WHERE account_id = ?"
-            " ORDER BY date DESC LIMIT 1",
+            "SELECT balance FROM balances WHERE account_id = ? ORDER BY date DESC LIMIT 1",
             (account_id,),
         ).fetchone()
         if row:
@@ -33,9 +32,13 @@ def get_goals(conn):
     ).fetchall()
     return [
         {
-            "id": r[0], "name": r[1], "target_amount": r[2],
-            "target_date": r[3], "account_id": r[4],
-            "starting_balance": r[5], "created_at": r[6],
+            "id": r[0],
+            "name": r[1],
+            "target_amount": r[2],
+            "target_date": r[3],
+            "account_id": r[4],
+            "starting_balance": r[5],
+            "created_at": r[6],
         }
         for r in rows
     ]
@@ -55,9 +58,7 @@ def update_goal(conn, goal_id, name=None, target_amount=None, target_date=None):
     if not updates:
         return
     params.append(goal_id)
-    conn.execute(
-        f"UPDATE goals SET {', '.join(updates)} WHERE id = ?", params
-    )
+    conn.execute(f"UPDATE goals SET {', '.join(updates)} WHERE id = ?", params)
     conn.commit()
 
 
@@ -81,8 +82,7 @@ def goal_progress(conn, goal_id):
     linked = False
     if account_id:
         bal_row = conn.execute(
-            "SELECT balance FROM balances WHERE account_id = ?"
-            " ORDER BY date DESC LIMIT 1",
+            "SELECT balance FROM balances WHERE account_id = ? ORDER BY date DESC LIMIT 1",
             (account_id,),
         ).fetchone()
         if bal_row:

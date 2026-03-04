@@ -139,8 +139,9 @@ def snapshot_balance(conn, account_id, date, balance, available_balance=None):
     conn.commit()
 
 
-def upsert_transaction(conn, id, account_id, posted, amount, description,
-                       category=None, pending=False, raw_json=None):
+def upsert_transaction(
+    conn, id, account_id, posted, amount, description, category=None, pending=False, raw_json=None
+):
     conn.execute(
         "INSERT INTO transactions (id, account_id, posted, amount, description,"
         " category, pending, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
@@ -154,8 +155,7 @@ def upsert_transaction(conn, id, account_id, posted, amount, description,
 
 def log_sync(conn, accounts_updated, transactions_added, status="success"):
     conn.execute(
-        "INSERT INTO sync_log (accounts_updated, transactions_added, status)"
-        " VALUES (?, ?, ?)",
+        "INSERT INTO sync_log (accounts_updated, transactions_added, status) VALUES (?, ?, ?)",
         (accounts_updated, transactions_added, status),
     )
     conn.commit()
@@ -194,8 +194,13 @@ def get_transaction(conn, txn_id):
     if not row:
         return None
     return {
-        "id": row[0], "posted": row[1], "amount": row[2],
-        "description": row[3], "category": row[4] or "",
-        "notes": row[5] or "", "pending": bool(row[6]),
-        "account": row[7], "institution": row[8] or "",
+        "id": row[0],
+        "posted": row[1],
+        "amount": row[2],
+        "description": row[3],
+        "category": row[4] or "",
+        "notes": row[5] or "",
+        "pending": bool(row[6]),
+        "account": row[7],
+        "institution": row[8] or "",
     }
