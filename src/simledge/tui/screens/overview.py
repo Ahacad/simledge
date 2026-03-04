@@ -9,7 +9,9 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Static
 
 from simledge.analysis import monthly_summary, spending_by_category_grouped, recent_transactions, income_by_category
+from simledge.budget import budget_vs_actual, total_budget_summary
 from simledge.config import DB_PATH
+from simledge.goals import all_goals_progress
 from simledge.db import init_db, get_last_sync
 from simledge.tui.widgets.navbar import NavBar
 
@@ -28,6 +30,8 @@ class OverviewScreen(Screen):
         with VerticalScroll():
             yield Vertical(Static("", id="summary-content"), id="summary-panel", classes="panel")
             yield Vertical(Static("", id="category-content"), id="category-panel", classes="panel")
+            yield Vertical(Static("", id="budget-overview-content"), id="budget-overview-panel", classes="panel")
+            yield Vertical(Static("", id="goals-overview-content"), id="goals-overview-panel", classes="panel")
             yield Vertical(DataTable(id="recent-table"), Static("", id="sync-status"), id="recent-panel", classes="panel")
 
     def on_mount(self):
@@ -71,6 +75,9 @@ class OverviewScreen(Screen):
         summary = monthly_summary(conn, month, account_ids=account_ids)
         categories = spending_by_category_grouped(conn, month, account_ids=account_ids)
         inc_cats = income_by_category(conn, month, account_ids=account_ids)
+        budget_items = budget_vs_actual(conn, month, account_ids=account_ids)
+        budget_summary = total_budget_summary(conn, month, account_ids=account_ids) if budget_items else None
+        goals_progress = all_goals_progress(conn)
         recent = recent_transactions(conn, limit=10, account_ids=account_ids)
         last_sync = get_last_sync(conn)
         txn_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
@@ -126,6 +133,58 @@ class OverviewScreen(Screen):
             self.query_one("#category-content", Static).update("\n".join(lines))
         else:
             self.query_one("#category-content", Static).update("[dim]No spending data this month[/]")
+
+        # Budget overview (only if budgets exist)
+        budget_panel = self.query_one("#budget-overview-panel")
+        if budget_items:
+            budget_panel.border_title = "Budget"
+            budget_panel.display = True
+            bar_char_b = "\u2588"
+            empty_char_b = "\u2591"
+            bw = 20
+            blines = []
+            alert_items = [i for i in budget_items if i["pct_used"] >= 80]
+            show_items = alert_items if alert_items else budget_items[:3]
+            for item in show_items:
+                pct = item["pct_used"]
+                filled = min(int(bw * pct / 100), bw)
+                if pct > 100:
+                    color = "#ef4444"
+                    warn = " \u26a0"
+                elif pct >= 80:
+                    color = "#eab308"
+                    warn = ""
+                else:
+                    color = "#22c55e"
+                    warn = ""
+                bar = f"[{color}]{bar_char_b * filled}[/][#333]{empty_char_b * (bw - filled)}[/]"
+                blines.append(f"{item['category']:<14} {bar} {pct:>5.1f}%{warn}")
+            pace = budget_summary["daily_pace"] if budget_summary["days_remaining"] > 0 else 0
+            remaining = budget_summary["total_remaining"]
+            rem_color = "#22c55e" if remaining >= 0 else "#ef4444"
+            blines.append(f"\n[{rem_color}]${remaining:+,.2f} remaining[/] \u00b7 ${pace:,.2f}/day pace")
+            self.query_one("#budget-overview-content", Static).update("\n".join(blines))
+        else:
+            budget_panel.display = False
+
+        # Goals panel (compact — only if goals exist)
+        goals_panel = self.query_one("#goals-overview-panel")
+        if goals_progress:
+            goals_panel.border_title = "Goals"
+            goals_panel.display = True
+            bar_char = "\u2588"
+            empty_char = "\u2591"
+            glines = []
+            for g in goals_progress:
+                pct = g["pct_complete"]
+                bw = 20
+                filled = int(bw * min(pct, 100) / 100)
+                color = "#22c55e" if pct >= 100 else "#2dd4bf" if pct >= 50 else "#ef4444"
+                bar = f"[{color}]{bar_char * filled}[/][#333]{empty_char * (bw - filled)}[/]"
+                glines.append(f"{g['name']:<16} {bar}  {pct:.0f}%")
+            self.query_one("#goals-overview-content", Static).update("\n".join(glines))
+        else:
+            goals_panel.display = False
 
         # Recent transactions
         table = self.query_one("#recent-table", DataTable)
