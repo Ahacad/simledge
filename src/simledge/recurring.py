@@ -1,5 +1,6 @@
 """Detect recurring transactions from transaction history."""
 
+import calendar as cal_mod
 import re
 import statistics
 from datetime import date, datetime, timedelta
@@ -166,3 +167,86 @@ def generate_occurrences(recurring_item, start_date, end_date):
         cursor += timedelta(days=interval)
 
     return occurrences
+
+
+def check_bill_paid(conn, description, expected_amount, expected_date, tolerance_days=5):
+    """Check if a matching transaction exists near the expected date.
+
+    Returns dict with paid, actual_date, actual_amount.
+    """
+    norm_desc = _normalize_description(description)
+    rows = conn.execute(
+        "SELECT t.posted, t.amount, t.description"
+        " FROM transactions t"
+        " WHERE t.pending = 0"
+        " ORDER BY t.posted DESC"
+    ).fetchall()
+
+    best = None
+    best_dist = None
+    for posted, amount, desc in rows:
+        if _normalize_description(desc) != norm_desc:
+            continue
+        if expected_amount != 0 and abs(amount - expected_amount) > abs(expected_amount) * 0.10:
+            continue
+        try:
+            txn_date = datetime.strptime(posted[:10], "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        if isinstance(expected_date, str):
+            expected_date = datetime.strptime(expected_date, "%Y-%m-%d").date()
+        dist = abs((txn_date - expected_date).days)
+        if dist > tolerance_days:
+            continue
+        if best is None or dist < best_dist:
+            best = {"paid": True, "actual_date": posted[:10], "actual_amount": amount}
+            best_dist = dist
+
+    if best:
+        return best
+    return {"paid": False, "actual_date": None, "actual_amount": None}
+
+
+def calendar_bills(conn, month):
+    """Return all expected bill occurrences for a given YYYY-MM month with status.
+
+    Returns list sorted by date with date, day, weekday, description,
+    expected_amount, status, actual_amount, account.
+    """
+    year, mon = int(month[:4]), int(month[5:7])
+    month_start = date(year, mon, 1)
+    last_day = cal_mod.monthrange(year, mon)[1]
+    month_end = date(year, mon, last_day)
+    today = date.today()
+
+    recurring = detect_recurring(conn)
+    results = []
+
+    for item in recurring:
+        occs = generate_occurrences(item, month_start, month_end)
+        for occ in occs:
+            occ_date = datetime.strptime(occ["date"], "%Y-%m-%d").date()
+            paid_info = check_bill_paid(
+                conn, occ["description"], occ["amount"], occ_date
+            )
+
+            if paid_info["paid"]:
+                status = "paid"
+            elif occ_date < today:
+                status = "overdue"
+            else:
+                status = "upcoming"
+
+            results.append({
+                "date": occ["date"],
+                "day": occ_date.day,
+                "weekday": occ_date.weekday(),
+                "description": occ["description"],
+                "expected_amount": occ["amount"],
+                "status": status,
+                "actual_amount": paid_info["actual_amount"],
+                "account": occ["account"],
+            })
+
+    results.sort(key=lambda r: r["date"])
+    return results
