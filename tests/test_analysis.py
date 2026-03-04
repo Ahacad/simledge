@@ -112,3 +112,65 @@ def test_account_summary_filtered(tmp_path):
     assert len(result) == 1
     assert result[0]["name"] == "Credit Card"
     conn.close()
+
+
+# --- Category Hierarchy tests ---
+
+def test_spending_by_category_grouped_flat(tmp_path):
+    from simledge.analysis import spending_by_category_grouped
+    conn = _seed_db(tmp_path)
+    result = spending_by_category_grouped(conn, "2026-03")
+    # All categories in _seed_db are flat (no colon)
+    for group in result:
+        assert group["children"] == []
+        assert ":" not in group["category"]
+    assert len(result) == 3  # groceries, shopping, gas
+    conn.close()
+
+
+def test_spending_by_category_grouped_hierarchical(tmp_path):
+    from simledge.analysis import spending_by_category_grouped
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -100.00, "TEST_GROCERY", category="Food:Groceries")
+    upsert_transaction(conn, "t2", "acct-1", "2026-03-02", -50.00, "TEST_DINING", category="Food:Dining")
+    upsert_transaction(conn, "t3", "acct-1", "2026-03-03", -30.00, "TEST_SHOP", category="Shopping")
+    result = spending_by_category_grouped(conn, "2026-03")
+    # Should have 2 groups: Food (with 2 children), Shopping (flat)
+    assert len(result) == 2
+    food = [g for g in result if g["category"] == "Food"][0]
+    assert food["total"] == -150.00
+    assert len(food["children"]) == 2
+    child_cats = {c["category"] for c in food["children"]}
+    assert child_cats == {"Food:Groceries", "Food:Dining"}
+    shopping = [g for g in result if g["category"] == "Shopping"][0]
+    assert shopping["total"] == -30.00
+    assert shopping["children"] == []
+    conn.close()
+
+
+def test_spending_by_category_grouped_single_child(tmp_path):
+    from simledge.analysis import spending_by_category_grouped
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -75.00, "TEST_GROCERY", category="Food:Groceries")
+    result = spending_by_category_grouped(conn, "2026-03")
+    assert len(result) == 1
+    food = result[0]
+    assert food["category"] == "Food"
+    assert food["total"] == -75.00
+    assert len(food["children"]) == 1
+    assert food["children"][0]["category"] == "Food:Groceries"
+    conn.close()
+
+
+def test_spending_by_category_grouped_empty(tmp_path):
+    from simledge.analysis import spending_by_category_grouped
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    result = spending_by_category_grouped(conn, "2026-03")
+    assert result == []
+    conn.close()

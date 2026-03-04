@@ -8,7 +8,7 @@ from textual.containers import VerticalScroll, Vertical
 from textual.screen import Screen
 from textual.widgets import Sparkline, Static
 
-from simledge.analysis import spending_trend, spending_by_category
+from simledge.analysis import spending_trend, spending_by_category_grouped, income_trend, income_by_category
 from simledge.config import DB_PATH
 from simledge.db import init_db
 from simledge.tui.widgets.navbar import NavBar
@@ -27,6 +27,10 @@ class TrendsScreen(Screen):
                 yield Sparkline([], id="spending-sparkline", classes="sparkline-spending")
                 yield Static("", id="chart-labels")
             yield Vertical(Static("", id="comparison-content"), id="comparison-panel", classes="panel")
+            with Vertical(id="income-panel", classes="panel"):
+                yield Sparkline([], id="income-sparkline", classes="sparkline-income")
+                yield Static("", id="income-labels")
+                yield Static("", id="income-sources")
 
     def on_mount(self):
         self._lookback = 6
@@ -56,8 +60,10 @@ class TrendsScreen(Screen):
         )
         prev_month = prev_month_dt.strftime("%Y-%m")
 
-        current_cats = spending_by_category(conn, current_month, account_ids=account_ids)
-        prev_cats = spending_by_category(conn, prev_month, account_ids=account_ids)
+        current_cats = spending_by_category_grouped(conn, current_month, account_ids=account_ids)
+        prev_cats = spending_by_category_grouped(conn, prev_month, account_ids=account_ids)
+        inc_trend = income_trend(conn, months=self._lookback, account_ids=account_ids)
+        inc_cats = income_by_category(conn, current_month, account_ids=account_ids)
         conn.close()
 
         # Sparkline chart
@@ -95,3 +101,32 @@ class TrendsScreen(Screen):
             lines.append("[dim]No comparison data yet. Run: simledge sync[/]")
 
         self.query_one("#comparison-content", Static).update("\n".join(lines))
+
+        # Income panel
+        self.query_one("#income-panel").border_title = f"Income ({self._lookback}mo)"
+        if inc_trend:
+            inc_labels = [t["month"][5:] for t in inc_trend]
+            inc_values = [t["total"] for t in inc_trend]
+            self.query_one("#income-sparkline", Sparkline).data = inc_values
+            self.query_one("#income-labels", Static).update(
+                "  ".join(f"[dim]{m}[/]" for m in inc_labels)
+            )
+        else:
+            self.query_one("#income-sparkline", Sparkline).data = []
+            self.query_one("#income-labels", Static).update("[dim]No income data yet[/]")
+
+        if inc_cats:
+            total_inc = sum(c["total"] for c in inc_cats)
+            max_total = inc_cats[0]["total"] if inc_cats else 1
+            src_lines = []
+            for c in inc_cats:
+                cat = c["category"]
+                amt = c["total"]
+                pct = (amt / total_inc * 100) if total_inc else 0
+                bar_width = 25
+                filled = int(bar_width * (amt / max_total)) if max_total > 0 else 0
+                bar = f"[#22c55e]{chr(0x2588) * filled}[/][#333]{chr(0x2591) * (bar_width - filled)}[/]"
+                src_lines.append(f"{cat:<18} [bold]${amt:>9,.2f}[/]  {bar}  [dim]{pct:>5.1f}%[/]")
+            self.query_one("#income-sources", Static).update("\n".join(src_lines))
+        else:
+            self.query_one("#income-sources", Static).update("[dim]No income this month[/]")

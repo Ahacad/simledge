@@ -90,6 +90,79 @@ def spending_trend(conn, months=6, account_ids=None):
     return [{"month": r[0], "total": r[1]} for r in rows]
 
 
+def income_by_category(conn, month, account_ids=None):
+    """Return income grouped by category for a YYYY-MM month."""
+    filt, filt_params = _account_filter(account_ids)
+    rows = conn.execute(
+        "SELECT COALESCE(category, 'uncategorized') as cat, SUM(amount) as total"
+        " FROM transactions"
+        " WHERE strftime('%Y-%m', posted) = ? AND amount > 0"
+        + filt
+        + " GROUP BY cat ORDER BY total DESC",
+        [month] + filt_params,
+    ).fetchall()
+    return [{"category": r[0], "total": r[1]} for r in rows]
+
+
+def income_trend(conn, months=6, account_ids=None):
+    """Return total income per month for the last N months."""
+    today = datetime.now()
+    start = today - timedelta(days=months * 31)
+    start_str = start.strftime("%Y-%m-%d")
+
+    filt, filt_params = _account_filter(account_ids)
+    rows = conn.execute(
+        "SELECT strftime('%Y-%m', posted) as month, SUM(amount) as total"
+        " FROM transactions WHERE amount > 0 AND posted >= ?"
+        + filt
+        + " GROUP BY month ORDER BY month",
+        [start_str] + filt_params,
+    ).fetchall()
+    return [{"month": r[0], "total": r[1]} for r in rows]
+
+
+def spending_by_category_grouped(conn, month, account_ids=None):
+    """Return spending grouped by parent category with children breakdown."""
+    flat = spending_by_category(conn, month, account_ids=account_ids)
+    parents = {}
+    order = []
+    for entry in flat:
+        cat = entry["category"]
+        if ":" in cat:
+            parent, _ = cat.split(":", 1)
+        else:
+            parent = cat
+        if parent not in parents:
+            parents[parent] = {"category": parent, "total": 0, "children": []}
+            order.append(parent)
+        parents[parent]["total"] += entry["total"]
+        if ":" in cat:
+            parents[parent]["children"].append(entry)
+    # Sort children within each parent by total ascending (most spending first)
+    for p in parents.values():
+        p["children"].sort(key=lambda c: c["total"])
+    return [parents[k] for k in order]
+
+
+def spending_by_tag(conn, month, account_ids=None):
+    """Return spending grouped by tag for a YYYY-MM month.
+
+    A transaction with multiple tags appears in each tag's total.
+    """
+    filt, filt_params = _account_filter(account_ids, table_prefix="t.")
+    rows = conn.execute(
+        "SELECT tg.name, SUM(t.amount) as total"
+        " FROM transactions t"
+        " JOIN transaction_tags tt ON t.id = tt.transaction_id"
+        " JOIN tags tg ON tt.tag_id = tg.id"
+        " WHERE strftime('%Y-%m', t.posted) = ? AND t.amount < 0"
+        + filt
+        + " GROUP BY tg.name ORDER BY total ASC",
+        [month] + filt_params,
+    ).fetchall()
+    return [{"tag": r[0], "total": r[1]} for r in rows]
+
+
 def recent_transactions(conn, limit=20, account_ids=None):
     """Return the most recent transactions."""
     filt, filt_params = _account_filter(account_ids, table_prefix="t.")
