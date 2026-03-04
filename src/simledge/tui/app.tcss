@@ -76,6 +76,13 @@ Sparkline {
     color: #22c55e 30%;
 }
 
+.sparkline-income > .sparkline--max-color {
+    color: #22c55e;
+}
+.sparkline-income > .sparkline--min-color {
+    color: #22c55e 30%;
+}
+
 /* Help modal */
 HelpScreen {
     align: center middle;
@@ -238,6 +245,38 @@ FilterModal {
     text-align: center;
 }
 
+/* Tag filter modal */
+TagFilterModal {
+    align: center middle;
+}
+
+#tag-filter-box {
+    width: 45;
+    height: auto;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#tag-filter-title {
+    height: 1;
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#tag-filter-box Input {
+    margin: 0 0 1 0;
+}
+
+#tag-filter-box Input:focus {
+    border: round #2dd4bf;
+}
+
+#tag-filter-hint {
+    height: 1;
+    text-align: center;
+}
+
 /* Bills / Recurring screen */
 #bills-panel {
     height: 1fr;
@@ -245,4 +284,98 @@ FilterModal {
 
 #bills-table {
     height: 1fr;
+}
+
+/* Budget screen */
+#budget-panel {
+    height: 1fr;
+}
+
+#budget-table {
+    height: 1fr;
+}
+
+#budget-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+/* Budget modal */
+BudgetModal {
+    align: center middle;
+}
+
+#budget-modal-box {
+    width: 50;
+    height: auto;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#budget-modal-title {
+    height: 1;
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#budget-modal-box Input {
+    margin: 0 0 1 0;
+}
+
+#budget-modal-box Input:focus {
+    border: round #2dd4bf;
+}
+
+#budget-modal-hint {
+    height: 1;
+    text-align: center;
+}
+
+/* Goals screen */
+#goals-scroll {
+    height: 1fr;
+}
+
+#goals-panel {
+    height: auto;
+}
+
+#goals-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+/* Goal modal */
+GoalModal {
+    align: center middle;
+}
+
+#goal-modal-box {
+    width: 50;
+    height: auto;
+    padding: 1 2;
+    border: round #2dd4bf;
+    background: $surface;
+}
+
+#goal-modal-title {
+    height: 1;
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#goal-modal-box Input {
+    margin: 0 0 1 0;
+}
+
+#goal-modal-box Input:focus {
+    border: round #2dd4bf;
+}
+
+#goal-modal-hint {
+    height: 1;
+    text-align: center;
 }
