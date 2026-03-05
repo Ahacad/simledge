@@ -231,20 +231,6 @@ def recent_transactions(conn, limit=20, account_ids=None):
     ]
 
 
-def top_merchants(conn, month, limit=5, account_ids=None):
-    """Return top merchants by spending for a month."""
-    filt, filt_params = _account_filter(account_ids)
-    rows = conn.execute(
-        "SELECT description, COUNT(*) as cnt, SUM(amount) as total"
-        " FROM transactions"
-        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
-        + filt
-        + " GROUP BY description ORDER BY total ASC LIMIT ?",
-        [month, *filt_params, limit],
-    ).fetchall()
-    return [{"merchant": r[0], "count": r[1], "total": r[2]} for r in rows]
-
-
 def uncategorized_count(conn, month, account_ids=None):
     """Return count of uncategorized transactions for a month."""
     filt, filt_params = _account_filter(account_ids)
@@ -255,20 +241,6 @@ def uncategorized_count(conn, month, account_ids=None):
         [month, *filt_params],
     ).fetchone()
     return row[0]
-
-
-def daily_average_spending(conn, month, account_ids=None):
-    """Return average daily spending for a month (up to today or month end)."""
-    filt, filt_params = _account_filter(account_ids)
-    rows = conn.execute(
-        "SELECT COUNT(DISTINCT posted) as days, COALESCE(SUM(amount), 0) as total"
-        " FROM transactions"
-        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
-        + filt,
-        [month, *filt_params],
-    ).fetchone()
-    days, total = rows[0], rows[1]
-    return abs(total) / days if days > 0 else 0
 
 
 def yoy_comparison(conn, month, account_ids=None):

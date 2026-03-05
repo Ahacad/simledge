@@ -235,7 +235,7 @@ async def run_sync(full=False, start_date=None, quiet=False):
     log_sync(conn, len(accounts), txn_count)
 
     # Auto-apply category rules from TOML
-    from simledge.categorize import apply_rules, load_rules
+    from simledge.categorize import apply_rules, detect_cc_payments, load_rules
     from simledge.config import RULES_PATH
 
     rules = load_rules(RULES_PATH)
@@ -243,6 +243,10 @@ async def run_sync(full=False, start_date=None, quiet=False):
         cat_count = apply_rules(rules, conn)
         if cat_count and not quiet:
             print(f"Auto-categorized {cat_count} transactions")
+
+    cc_count = detect_cc_payments(conn)
+    if cc_count and not quiet:
+        print(f"Detected {cc_count} credit card payment transfers")
 
     if not quiet:
         print(f"Synced {len(accounts)} accounts, {txn_count} transactions")

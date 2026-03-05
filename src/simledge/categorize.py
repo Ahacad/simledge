@@ -137,7 +137,13 @@ DEFAULT_RULES = [
         "priority": 0,
     },
     {"pattern": "REFUND|RETURN|CREDIT ADJ", "category": "Income:Refund", "priority": 0},
-    # Transfer
+    # Transfer — credit card payments
+    {
+        "pattern": "AUTOPAY|AUTO\\s*PAY|PAYMENT\\s*-?\\s*THANK\\s*YOU|BILL\\s+PAY",
+        "category": "Transfer:Credit Card Payment",
+        "priority": 10,
+    },
+    # Transfer — general
     {
         "pattern": "TRANSFER|XFER|ZELLE|VENMO|PAYPAL.*TRANSFER|CASH APP",
         "category": "Transfer",
