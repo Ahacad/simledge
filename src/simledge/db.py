@@ -133,6 +133,14 @@ def upsert_account(conn, id, institution_id, name, currency="USD", type=None):
     conn.commit()
 
 
+def update_account_type(conn, account_id, account_type):
+    conn.execute(
+        "UPDATE accounts SET type = ? WHERE id = ?",
+        (account_type or None, account_id),
+    )
+    conn.commit()
+
+
 def update_account_display_name(conn, account_id, display_name):
     conn.execute(
         "UPDATE accounts SET display_name = ? WHERE id = ?",

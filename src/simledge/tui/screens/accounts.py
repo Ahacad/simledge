@@ -1,21 +1,32 @@
 """Accounts screen — balances grouped by institution with editable display names."""
 
+import contextlib
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Input, Static
+from textual.widgets import DataTable, Input, Select, Static
 
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
-from simledge.db import init_db, update_account_display_name
+from simledge.db import init_db, update_account_display_name, update_account_type
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
+
+ACCOUNT_TYPES = [
+    ("Checking", "checking"),
+    ("Savings", "savings"),
+    ("Credit Card", "credit"),
+    ("Investment", "investment"),
+    ("Other", "other"),
+]
 
 
 class AccountsScreen(Screen):
     BINDINGS = [
         Binding("e", "edit_name", "e Rename", priority=True),
+        Binding("t", "edit_type", "t Type", priority=True),
     ]
 
     def compose(self) -> ComposeResult:
@@ -77,7 +88,7 @@ class AccountsScreen(Screen):
         )
         self.query_one("#accounts-summary", Static).update(summary)
 
-        status = f"[dim]{len(accounts)} accounts  |  e: rename[/]"
+        status = f"[dim]{len(accounts)} accounts  |  e: rename  t: type[/]"
         self.query_one("#accounts-status", Static).update(status)
         self.query_one("#accounts-panel").border_title = "Accounts"
 
@@ -134,10 +145,50 @@ class AccountsScreen(Screen):
     def _cleanup_edit(self):
         self._editing = False
         self._edit_account_id = None
-        try:
-            inp = self.query_one("#edit-name-input", Input)
-            inp.remove()
-        except Exception:
-            pass
+        for widget_id in ("#edit-name-input", "#edit-type-select"):
+            with contextlib.suppress(Exception):
+                self.query_one(widget_id).remove()
         self.query_one("#accounts-status", Static).display = True
         self.query_one("#accounts-table", DataTable).focus()
+
+    def action_edit_type(self):
+        if self._editing:
+            return
+        table = self.query_one("#accounts-table", DataTable)
+        if table.row_count == 0:
+            return
+        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+        account_id = str(row_key.value)
+
+        acct = next((a for a in self._accounts if a["id"] == account_id), None)
+        if not acct:
+            return
+
+        self._edit_account_id = account_id
+        current = acct["type"]
+
+        status = self.query_one("#accounts-status", Static)
+        status.display = False
+
+        sel = Select(
+            ACCOUNT_TYPES,
+            value=current if current else Select.BLANK,
+            prompt="Account type...",
+            id="edit-type-select",
+        )
+        self.query_one("#accounts-panel").mount(sel)
+        sel.focus()
+        self._editing = True
+
+    def on_select_changed(self, event: Select.Changed):
+        if event.select.id == "edit-type-select":
+            val = event.value
+            if val == Select.BLANK:
+                return
+            conn = init_db(DB_PATH)
+            update_account_type(conn, self._edit_account_id, val)
+            conn.close()
+            self._cleanup_edit()
+            self._refresh_data()
+            label = next((name for name, v in ACCOUNT_TYPES if v == val), val)
+            self.app.notify(f"Account type set to '{label}'")
