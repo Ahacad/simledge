@@ -80,7 +80,7 @@ class TransactionDetailScreen(ModalScreen):
             yield Static("[dim]Category[/]", classes="field-label")
             yield Input(
                 value=category_value,
-                placeholder="Enter category (Tab to accept suggestion)...",
+                placeholder="Enter category (Right to accept suggestion)...",
                 suggester=suggester,
                 id="txn-category",
             )
@@ -97,7 +97,7 @@ class TransactionDetailScreen(ModalScreen):
                 id="txn-tags",
             )
             yield Static(
-                "[dim]Tab[/] accept suggestion  [dim]Enter[/] save  [dim]Esc[/] cancel",
+                "[dim]Right[/] accept suggestion  [dim]Enter[/] save  [dim]Esc[/] cancel",
                 id="txn-detail-hint",
             )
 
