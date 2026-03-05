@@ -207,7 +207,7 @@ class TransactionsScreen(Screen):
 
         query = (
             "SELECT t.id, t.posted, t.description, COALESCE(t.category, '\u2014'),"
-            " t.amount, a.name, t.pending"
+            " t.amount, COALESCE(a.display_name, a.name), t.pending"
             " FROM transactions t JOIN accounts a ON t.account_id = a.id"
             " WHERE strftime('%Y-%m', t.posted) = ?"
         )
