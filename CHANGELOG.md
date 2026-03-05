@@ -2,6 +2,14 @@
 
 ### Bug Fixes
 
+- Remove unused init_child variable in transaction detail ([983e402](https://github.com/Ahacad/simledge/commit/983e402bcc6087fee84dee6e11e0e8260dc2ab08))
+
+### Features
+
+- Add force apply levels and widen CC payment date window ([520e9ad](https://github.com/Ahacad/simledge/commit/520e9add1d9c791c4f7b571cb439a76268654f11))
+
+### Bug Fixes
+
 - Fix Enter key on transactions table ([1c33931](https://github.com/Ahacad/simledge/commit/1c339319265712af273b401c5af101aecc30a153))
 - Set DataTable cursor_type to row for Enter to work ([1f1151d](https://github.com/Ahacad/simledge/commit/1f1151d1bc00dfada9487550631f3f158b811cbf))
 - Correct hint text — Right arrow accepts suggestion, not Tab ([0df011d](https://github.com/Ahacad/simledge/commit/0df011db5862dcaa134fc62504ec1a333a7ac7ce))
