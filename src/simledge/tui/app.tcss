@@ -126,6 +126,18 @@ TransactionDetailScreen {
     margin: 1 0 0 0;
 }
 
+#txn-category-select {
+    margin: 0 0 0 0;
+}
+
+#txn-category-custom {
+    margin: 0 0 0 0;
+}
+
+#txn-category-custom:focus {
+    border: round #2dd4bf;
+}
+
 #txn-detail-hint {
     height: 1;
     margin: 1 0 0 0;
