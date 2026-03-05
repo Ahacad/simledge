@@ -105,7 +105,8 @@ class AccountFilterModal(ModalScreen):
                 bal = a["balance"] or 0
                 color = "#22c55e" if bal >= 0 else "#ef4444"
                 m = hasattr(self.app, "privacy_mode") and self.app.privacy_mode
-                label = f"{a['name']}  [{color}]{format_dollar(bal, masked=m)}[/]"
+                label_name = a.get("display_name") or a["name"]
+                label = f"{label_name}  [{color}]{format_dollar(bal, masked=m)}[/]"
                 checked = active is None or a["id"] in active
                 cb = Checkbox(label, value=checked, id=f"filter-{a['id']}")
                 cb._account_id = a["id"]
