@@ -172,8 +172,9 @@ class AccountsScreen(Screen):
 
         sel = Select(
             ACCOUNT_TYPES,
-            value=current if current else Select.BLANK,
+            value=current if current else Select.NULL,
             prompt="Account type...",
+            allow_blank=True,
             id="edit-type-select",
         )
         self.query_one("#accounts-panel").mount(sel)
@@ -183,7 +184,7 @@ class AccountsScreen(Screen):
     def on_select_changed(self, event: Select.Changed):
         if event.select.id == "edit-type-select":
             val = event.value
-            if val == Select.BLANK:
+            if val == Select.NULL:
                 return
             conn = init_db(DB_PATH)
             update_account_type(conn, self._edit_account_id, val)
