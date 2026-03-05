@@ -454,3 +454,86 @@ def test_ytd_comparison_first_year(tmp_path):
     assert result["previous_income"] == 0
     assert result["income_change_pct"] is None
     conn.close()
+
+
+# --- Transfer exclusion tests ---
+
+
+def test_spending_excludes_cc_payment_transfers(tmp_path):
+    from simledge.analysis import (
+        daily_average_spending,
+        monthly_summary,
+        spending_by_category,
+        spending_trend,
+        top_merchants,
+    )
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-2", "org-1", "Credit Card", "USD", "credit")
+
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -50.00, "WHOLE FOODS", category="Groceries"
+    )
+    upsert_transaction(
+        conn, "t2", "acct-1", "2026-03-01", -2000.00, "AUTOPAY",
+        category="Transfer:Credit Card Payment",
+    )
+    upsert_transaction(
+        conn, "t3", "acct-2", "2026-03-01", 2000.00, "PAYMENT THANK YOU",
+        category="Transfer:Credit Card Payment",
+    )
+    upsert_transaction(
+        conn, "t4", "acct-2", "2026-03-02", -30.00, "NETFLIX", category="Entertainment"
+    )
+
+    cats = spending_by_category(conn, "2026-03")
+    cat_names = [c["category"] for c in cats]
+    assert "Transfer:Credit Card Payment" not in cat_names
+    total_spending = sum(c["total"] for c in cats)
+    assert total_spending == -80.00
+
+    summary = monthly_summary(conn, "2026-03")
+    assert summary["total_spending"] == -80.00
+
+    trend = spending_trend(conn, months=1)
+    mar = [r for r in trend if r["month"] == "2026-03"]
+    assert mar[0]["total"] == -80.00
+
+    avg = daily_average_spending(conn, "2026-03")
+    assert avg == 40.00
+
+    merchants = top_merchants(conn, "2026-03", limit=10)
+    merchant_names = [m["merchant"] for m in merchants]
+    assert "AUTOPAY" not in merchant_names
+
+    conn.close()
+
+
+def test_ytd_excludes_transfers(tmp_path):
+    from datetime import datetime as dt
+    from unittest.mock import patch
+
+    from simledge.analysis import ytd_comparison
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -100.00, "GROCERY", category="Groceries"
+    )
+    upsert_transaction(
+        conn, "t2", "acct-1", "2026-03-01", -1500.00, "CC AUTOPAY",
+        category="Transfer:Credit Card Payment",
+    )
+
+    mock_now = dt(2026, 3, 15)
+    with patch("simledge.analysis.datetime") as mock_dt:
+        mock_dt.now.return_value = mock_now
+        mock_dt.side_effect = lambda *a, **kw: dt(*a, **kw)
+        result = ytd_comparison(conn)
+
+    assert result["current_spending"] == -100.00
+    conn.close()
