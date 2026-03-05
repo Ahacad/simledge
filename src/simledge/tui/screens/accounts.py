@@ -18,6 +18,7 @@ ACCOUNT_TYPES = [
     ("Checking", "checking"),
     ("Savings", "savings"),
     ("Credit Card", "credit"),
+    ("Loan", "loan"),
     ("Investment", "investment"),
     ("Other", "other"),
 ]
