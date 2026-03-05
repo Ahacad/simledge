@@ -146,7 +146,7 @@ class TransactionsScreen(Screen):
         yield NavBar("transactions")
         with Vertical(id="txn-panel", classes="panel"):
             yield Input(placeholder="Press / to search, f for filters...", id="search-input")
-            yield DataTable(id="txn-table")
+            yield DataTable(id="txn-table", cursor_type="row")
             yield Static("", id="txn-status")
 
     def on_mount(self):
