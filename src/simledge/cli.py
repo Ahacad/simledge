@@ -34,6 +34,8 @@ def main():
     add_p.add_argument("--priority", type=int, default=0)
     rule_sub.add_parser("list", help="list all rules")
     rule_sub.add_parser("test", help="dry-run rules against uncategorized")
+    apply_p = rule_sub.add_parser("apply", help="apply rules + CC detection to existing data")
+    apply_p.add_argument("--force", action="store_true", help="reset all categories first")
 
     args = parser.parse_args()
 
@@ -202,8 +204,22 @@ def _run_rule(args):
         count = apply_rules(rules, conn, dry_run=True)
         conn.close()
         print(f"Would categorize {count} transactions.")
+    elif args.rule_command == "apply":
+        from simledge.categorize import detect_cc_payments
+        from simledge.db import init_db
+
+        rules = load_rules(RULES_PATH)
+        conn = init_db(DB_PATH)
+        if args.force:
+            conn.execute("UPDATE transactions SET category = NULL")
+            conn.commit()
+            print("Reset all categories.")
+        count = apply_rules(rules, conn)
+        cc_count = detect_cc_payments(conn)
+        conn.close()
+        print(f"Categorized {count} transactions, detected {cc_count} CC payment transfers.")
     else:
-        print("Usage: simledge rule {init,add,list,test}")
+        print("Usage: simledge rule {init,add,list,test,apply}")
 
 
 if __name__ == "__main__":

@@ -238,13 +238,16 @@ class RulesScreen(Screen):
     def _on_force_apply_confirm(self, confirmed):
         if not confirmed:
             return
+        from simledge.categorize import detect_cc_payments
+
         rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
         conn.execute("UPDATE transactions SET category = NULL")
         conn.commit()
         count = apply_rules(rules, conn)
+        cc_count = detect_cc_payments(conn)
         conn.close()
-        self.app.notify(f"Reset & re-categorized {count} transactions")
+        self.app.notify(f"Reset & re-categorized {count} transactions, {cc_count} CC transfers")
 
     def action_init_rules(self):
         created = init_rules(RULES_PATH)
