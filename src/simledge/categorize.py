@@ -246,3 +246,70 @@ def apply_rules(rules, conn, dry_run=False):
         conn.commit()
     log.info("categorized %d transactions (dry_run=%s)", count, dry_run)
     return count
+
+
+CC_PAYMENT_PATTERNS = re.compile(
+    r"AUTOPAY|AUTO\s*PAY|PAYMENT\s*-?\s*THANK\s*YOU|ONLINE\s+PAYMENT"
+    r"|MOBILE\s+PAYMENT|AUTOMATIC\s+PAYMENT|PAYMENT\s+RECEIVED"
+    r"|BILL\s+PAY|ACH\s+PAYMENT|CARD\s+PAYMENT",
+    re.IGNORECASE,
+)
+
+CC_ACCOUNT_TYPES = {"credit", "credit_card"}
+
+
+def detect_cc_payments(conn):
+    """Detect credit card payment transfer pairs and categorize them.
+
+    Hybrid: pair-matching (same day, same abs amount, opposite signs,
+    one CC account) gated by description (at least one side must match
+    CC payment patterns). Tags uncategorized matches as Transfer:Credit Card Payment.
+    """
+    rows = conn.execute(
+        "SELECT t.id, t.posted, t.amount, t.description, t.account_id, a.type, t.category"
+        " FROM transactions t"
+        " JOIN accounts a ON t.account_id = a.id"
+    ).fetchall()
+
+    from collections import defaultdict
+
+    groups = defaultdict(list)
+    for tid, posted, amount, desc, _acct_id, acct_type, category in rows:
+        key = (posted, round(abs(amount), 2))
+        groups[key].append({
+            "id": tid, "amount": amount, "description": desc,
+            "type": acct_type, "category": category,
+        })
+
+    count = 0
+    tagged = set()
+    for (_date, abs_amt), txns in groups.items():
+        if len(txns) < 2 or abs_amt == 0:
+            continue
+
+        negatives = [t for t in txns if t["amount"] < 0]
+        positives = [t for t in txns if t["amount"] > 0]
+
+        for neg in negatives:
+            for pos in positives:
+                neg_is_cc = neg["type"] in CC_ACCOUNT_TYPES
+                pos_is_cc = pos["type"] in CC_ACCOUNT_TYPES
+                if not (neg_is_cc ^ pos_is_cc):
+                    continue
+
+                if not (CC_PAYMENT_PATTERNS.search(neg["description"])
+                        or CC_PAYMENT_PATTERNS.search(pos["description"])):
+                    continue
+
+                for t in (neg, pos):
+                    if t["id"] not in tagged and t["category"] is None:
+                        conn.execute(
+                            "UPDATE transactions SET category = ? WHERE id = ?",
+                            ("Transfer:Credit Card Payment", t["id"]),
+                        )
+                        tagged.add(t["id"])
+                        count += 1
+
+    conn.commit()
+    log.info("detected %d credit card payment transactions", count)
+    return count
