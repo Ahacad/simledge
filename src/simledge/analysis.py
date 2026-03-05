@@ -293,7 +293,7 @@ def account_summary(conn, account_ids=None):
     filt, filt_params = _account_filter(account_ids, column="a.id")
     rows = conn.execute(
         "SELECT a.id, a.name, a.type, a.currency, i.name as institution,"
-        " b.balance, b.available_balance, b.date"
+        " b.balance, b.available_balance, b.date, a.display_name"
         " FROM accounts a"
         " LEFT JOIN institutions i ON a.institution_id = i.id"
         " LEFT JOIN balances b ON a.id = b.account_id"
@@ -311,6 +311,7 @@ def account_summary(conn, account_ids=None):
             "balance": r[5],
             "available_balance": r[6],
             "balance_date": r[7],
+            "display_name": r[8],
         }
         for r in rows
     ]

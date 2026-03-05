@@ -105,6 +105,10 @@ def init_db(db_path):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()}
     if "notes" not in cols:
         conn.execute("ALTER TABLE transactions ADD COLUMN notes TEXT")
+    # Migration: add display_name column to accounts if missing
+    acct_cols = {r[1] for r in conn.execute("PRAGMA table_info(accounts)").fetchall()}
+    if "display_name" not in acct_cols:
+        conn.execute("ALTER TABLE accounts ADD COLUMN display_name TEXT")
     conn.commit()
     log.debug("database initialized at %s", db_path)
     return conn
@@ -125,6 +129,14 @@ def upsert_account(conn, id, institution_id, name, currency="USD", type=None):
         " ON CONFLICT(id) DO UPDATE SET name=excluded.name, currency=excluded.currency,"
         " type=COALESCE(excluded.type, accounts.type)",
         (id, institution_id, name, currency, type),
+    )
+    conn.commit()
+
+
+def update_account_display_name(conn, account_id, display_name):
+    conn.execute(
+        "UPDATE accounts SET display_name = ? WHERE id = ?",
+        (display_name or None, account_id),
     )
     conn.commit()
 
