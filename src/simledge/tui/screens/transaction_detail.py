@@ -79,7 +79,7 @@ class TransactionDetailScreen(ModalScreen):
             # Has a value but not in known list — show custom input
             initial = _CUSTOM
         else:
-            initial = Select.BLANK
+            initial = Select.NULL
 
         with Middle(), Center(), Vertical(id="txn-detail-box"):
             yield Static(
@@ -144,7 +144,7 @@ class TransactionDetailScreen(ModalScreen):
         select = self.query_one("#txn-category-select", Select)
         if select.value == _CUSTOM:
             return self.query_one("#txn-category-custom", Input).value.strip()
-        elif select.value == Select.BLANK:
+        elif select.value == Select.NULL:
             return ""
         return str(select.value)
 
