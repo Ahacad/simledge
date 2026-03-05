@@ -9,13 +9,7 @@ RED = (239, 68, 68)
 
 
 def _fmt_dollar(v):
-    """Short dollar format for chart labels."""
-    if abs(v) >= 1_000_000:
-        return f"${v / 1_000_000:.1f}M"
-    elif abs(v) >= 10_000:
-        return f"${v / 1_000:.0f}k"
-    elif abs(v) >= 1_000:
-        return f"${v / 1_000:.1f}k"
+    """Dollar format for chart labels — exact, no cents."""
     return f"${v:,.0f}"
 
 

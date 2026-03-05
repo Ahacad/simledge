@@ -177,8 +177,8 @@ class SimpLedgeApp(App):
         self._maybe_auto_sync()
 
     def _migrate_budgets(self):
-        """One-time migration of budgets from SQLite to TOML."""
-        from simledge.budget import migrate_from_db
+        """One-time migration of budgets from SQLite to TOML, or init defaults."""
+        from simledge.budget import init_budgets, migrate_from_db
         from simledge.config import BUDGETS_PATH
 
         conn = init_db(DB_PATH)
@@ -186,6 +186,8 @@ class SimpLedgeApp(App):
         conn.close()
         if count:
             self.notify(f"Migrated {count} budgets to {BUDGETS_PATH}")
+        else:
+            init_budgets(BUDGETS_PATH)
 
     def _maybe_auto_sync(self):
         """Auto-sync if last successful sync was > 24h ago."""

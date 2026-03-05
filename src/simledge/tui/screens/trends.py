@@ -111,7 +111,7 @@ class TrendsScreen(Screen):
                 cur = c["total"]
                 prev = prev_dict.get(cat, 0)
                 if prev != 0:
-                    change = ((cur - prev) / abs(prev)) * 100
+                    change = ((abs(cur) - abs(prev)) / abs(prev)) * 100
                     arrow = "▲" if change > 0 else "▼"
                     color = "#ef4444" if change > 0 else "#22c55e"
                     lines.append(

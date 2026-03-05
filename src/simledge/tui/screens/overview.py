@@ -181,8 +181,9 @@ class OverviewScreen(Screen):
                 pct = (amt / total_spend * 100) if total_spend else 0
                 filled = int(bar_width * (pct / max_pct)) if max_pct > 0 else 0
                 bar = f"[#2dd4bf]{bar_char * filled}[/][#333]{empty_char * (bar_width - filled)}[/]"
+                cat_padded = f"{cat:<18}"
                 lines.append(
-                    f"[#2dd4bf]{cat:<18}[/] [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
+                    f"[#2dd4bf]{cat_padded}[/] [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
                 )
                 for child in c.get("children", []):
                     child_name = child["category"].split(":", 1)[1]
@@ -190,8 +191,9 @@ class OverviewScreen(Screen):
                     child_pct = (child_amt / total_spend * 100) if total_spend else 0
                     child_filled = int(bar_width * (child_pct / max_pct)) if max_pct > 0 else 0
                     child_bar = f"[#1a9985]{bar_char * child_filled}[/][#333]{empty_char * (bar_width - child_filled)}[/]"
+                    child_padded = f"{child_name:<16}"
                     lines.append(
-                        f"  [#5eead4]{child_name:<16}[/] [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]"
+                        f"  [#5eead4]{child_padded}[/] [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]"
                     )
             self.query_one("#category-content", Static).update("\n".join(lines))
         else:

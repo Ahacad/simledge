@@ -135,11 +135,14 @@ class RulesScreen(Screen):
         table = self.query_one("#rules-table", DataTable)
         table.clear(columns=True)
 
-        max_pat = max((len(r["pattern"]) for r in self._rules), default=7)
-        max_cat = max((len(r["category"]) for r in self._rules), default=8)
+        total_width = max(80, self.app.size.width - 6)
+        fixed = 4 + 8  # # + Priority
+        remaining = total_width - fixed
+        pat_width = int(remaining * 0.65)
+        cat_width = remaining - pat_width
         table.add_column("#", width=4)
-        table.add_column("Pattern", width=min(max(max_pat, 7), 60))
-        table.add_column("Category", width=min(max(max_cat, 8), 25))
+        table.add_column("Pattern", width=pat_width)
+        table.add_column("Category", width=cat_width)
         table.add_column("Priority", width=8)
 
         for i, r in enumerate(self._rules):
@@ -156,6 +159,9 @@ class RulesScreen(Screen):
             status += "  |  i: init defaults"
         status += "  |  n: new  d: delete  Enter: edit  r: apply  R: force apply  t: dry run[/]"
         self.query_one("#rules-status", Static).update(status)
+
+    def on_resize(self, event):
+        self._load_rules()
 
     def _get_selected_index(self):
         table = self.query_one("#rules-table", DataTable)
