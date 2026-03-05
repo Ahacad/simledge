@@ -35,7 +35,13 @@ def main():
     rule_sub.add_parser("list", help="list all rules")
     rule_sub.add_parser("test", help="dry-run rules against uncategorized")
     apply_p = rule_sub.add_parser("apply", help="apply rules + CC detection to existing data")
-    apply_p.add_argument("--force", action="store_true", help="reset all categories first")
+    force_group = apply_p.add_mutually_exclusive_group()
+    force_group.add_argument(
+        "--force", action="store_true", help="re-apply to all except manually set categories"
+    )
+    force_group.add_argument(
+        "--force-all", action="store_true", help="re-apply to ALL transactions including manual"
+    )
     apply_p.add_argument("--verbose", action="store_true", help="show detection diagnostics")
 
     args = parser.parse_args()
@@ -211,10 +217,17 @@ def _run_rule(args):
 
         rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
-        if args.force:
-            conn.execute("UPDATE transactions SET category = NULL")
+        if args.force_all:
+            conn.execute("UPDATE transactions SET category = NULL, category_source = NULL")
             conn.commit()
-            print("Reset all categories.")
+            print("Reset all categories (including manual).")
+        elif args.force:
+            conn.execute(
+                "UPDATE transactions SET category = NULL, category_source = NULL"
+                " WHERE category_source != 'manual' OR category_source IS NULL"
+            )
+            conn.commit()
+            print("Reset auto-categorized (kept manual).")
         count = apply_rules(rules, conn)
         cc_count = detect_cc_payments(conn, verbose=args.verbose)
         conn.close()

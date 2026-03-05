@@ -109,6 +109,10 @@ def init_db(db_path):
     acct_cols = {r[1] for r in conn.execute("PRAGMA table_info(accounts)").fetchall()}
     if "display_name" not in acct_cols:
         conn.execute("ALTER TABLE accounts ADD COLUMN display_name TEXT")
+    # Migration: add category_source column to track how category was set
+    # Values: 'rule', 'cc_detect', 'manual', or NULL (legacy/uncategorized)
+    if "category_source" not in cols:
+        conn.execute("ALTER TABLE transactions ADD COLUMN category_source TEXT")
     conn.commit()
     log.debug("database initialized at %s", db_path)
     return conn
@@ -198,6 +202,11 @@ def update_transaction_field(conn, txn_id, field, value):
         f"UPDATE transactions SET {field} = ? WHERE id = ?",
         (value, txn_id),
     )
+    if field == "category" and value is not None:
+        conn.execute(
+            "UPDATE transactions SET category_source = 'manual' WHERE id = ?",
+            (txn_id,),
+        )
     conn.commit()
 
 

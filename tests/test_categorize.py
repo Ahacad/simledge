@@ -318,3 +318,163 @@ def test_detect_cc_payments_no_match_without_cc_account(tmp_path):
     count = detect_cc_payments(conn)
     assert count == 0
     conn.close()
+
+
+def test_detect_cc_payments_different_days_within_window(tmp_path):
+    """CC payment pair posted on different days (within 5-day window) should match."""
+    from simledge.categorize import detect_cc_payments
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
+    # Checking posts Monday, CC posts Wednesday — 2 days apart
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-02", -500.00, "CHASE CARD AUTOPAY")
+    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-04", 500.00, "PAYMENT THANK YOU")
+
+    count = detect_cc_payments(conn)
+    assert count == 2
+    cat_out = conn.execute("SELECT category FROM transactions WHERE id='txn-out'").fetchone()[0]
+    cat_in = conn.execute("SELECT category FROM transactions WHERE id='txn-in'").fetchone()[0]
+    assert cat_out == "Transfer:Credit Card Payment"
+    assert cat_in == "Transfer:Credit Card Payment"
+    conn.close()
+
+
+def test_detect_cc_payments_outside_window_no_match(tmp_path):
+    """CC payment pair posted more than 5 days apart should NOT match."""
+    from simledge.categorize import detect_cc_payments
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
+    # 6 days apart — outside the 5-day window
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -500.00, "CHASE CARD AUTOPAY")
+    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-07", 500.00, "PAYMENT THANK YOU")
+
+    count = detect_cc_payments(conn)
+    assert count == 0
+    conn.close()
+
+
+def test_detect_cc_payments_5_days_apart_matches(tmp_path):
+    """Exactly 5 days apart should still match (boundary)."""
+    from simledge.categorize import detect_cc_payments
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -800.00, "AUTOPAY")
+    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-06", 800.00, "PAYMENT RECEIVED")
+
+    count = detect_cc_payments(conn)
+    assert count == 2
+    conn.close()
+
+
+def test_apply_rules_sets_category_source(tmp_path):
+    """apply_rules should set category_source='rule'."""
+    from simledge.categorize import apply_rules
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "txn-1", "acct-1", "2026-03-01", -50.00, "SAFEWAY GROCERY")
+
+    rules = [{"pattern": "SAFEWAY", "category": "Groceries", "priority": 0}]
+    apply_rules(rules, conn)
+
+    source = conn.execute("SELECT category_source FROM transactions WHERE id='txn-1'").fetchone()[0]
+    assert source == "rule"
+    conn.close()
+
+
+def test_detect_cc_payments_sets_category_source(tmp_path):
+    """detect_cc_payments should set category_source='cc_detect'."""
+    from simledge.categorize import detect_cc_payments
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -500.00, "AUTOPAY")
+    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-01", 500.00, "PAYMENT THANK YOU")
+
+    detect_cc_payments(conn)
+
+    for tid in ("txn-out", "txn-in"):
+        source = conn.execute(
+            "SELECT category_source FROM transactions WHERE id=?", (tid,)
+        ).fetchone()[0]
+        assert source == "cc_detect"
+    conn.close()
+
+
+def test_manual_category_sets_source(tmp_path):
+    """update_transaction_field for category should set category_source='manual'."""
+    from simledge.db import (
+        init_db,
+        update_transaction_field,
+        upsert_account,
+        upsert_institution,
+        upsert_transaction,
+    )
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "txn-1", "acct-1", "2026-03-01", -50.00, "SOME STORE")
+
+    update_transaction_field(conn, "txn-1", "category", "Shopping")
+
+    source = conn.execute("SELECT category_source FROM transactions WHERE id='txn-1'").fetchone()[0]
+    assert source == "manual"
+    conn.close()
+
+
+def test_force_apply_preserves_manual(tmp_path):
+    """Force apply should reset auto-categorized but keep manual."""
+    from simledge.categorize import apply_rules
+    from simledge.db import (
+        init_db,
+        update_transaction_field,
+        upsert_account,
+        upsert_institution,
+        upsert_transaction,
+    )
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "txn-auto", "acct-1", "2026-03-01", -50.00, "SAFEWAY GROCERY")
+    upsert_transaction(conn, "txn-manual", "acct-1", "2026-03-02", -30.00, "SOME STORE")
+
+    rules = [{"pattern": "SAFEWAY", "category": "Groceries", "priority": 0}]
+    apply_rules(rules, conn)
+    update_transaction_field(conn, "txn-manual", "category", "My Category")
+
+    # Force apply: reset non-manual, re-apply
+    conn.execute(
+        "UPDATE transactions SET category = NULL, category_source = NULL"
+        " WHERE category_source != 'manual' OR category_source IS NULL"
+    )
+    conn.commit()
+    apply_rules(rules, conn)
+
+    # Manual category preserved
+    manual_cat = conn.execute("SELECT category FROM transactions WHERE id='txn-manual'").fetchone()[
+        0
+    ]
+    assert manual_cat == "My Category"
+
+    # Auto re-applied
+    auto_cat = conn.execute("SELECT category FROM transactions WHERE id='txn-auto'").fetchone()[0]
+    assert auto_cat == "Groceries"
+    conn.close()

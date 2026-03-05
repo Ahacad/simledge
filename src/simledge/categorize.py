@@ -3,6 +3,7 @@
 import os
 import re
 import tomllib
+from datetime import date, timedelta
 
 from simledge.log import setup_logging
 
@@ -233,7 +234,8 @@ def apply_rules(rules, conn, dry_run=False):
                 if re.search(pattern, description, re.IGNORECASE):
                     if not dry_run:
                         conn.execute(
-                            "UPDATE transactions SET category = ? WHERE id = ?",
+                            "UPDATE transactions SET category = ?, category_source = 'rule'"
+                            " WHERE id = ?",
                             (category, txn_id),
                         )
                     count += 1
@@ -242,7 +244,8 @@ def apply_rules(rules, conn, dry_run=False):
                 if pattern.upper() in description.upper():
                     if not dry_run:
                         conn.execute(
-                            "UPDATE transactions SET category = ? WHERE id = ?",
+                            "UPDATE transactions SET category = ?, category_source = 'rule'"
+                            " WHERE id = ?",
                             (category, txn_id),
                         )
                     count += 1
@@ -264,13 +267,30 @@ CC_PAYMENT_PATTERNS = re.compile(
 CC_ACCOUNT_TYPES = {"credit", "credit_card"}
 _KNOWN_NON_CC_TYPES = {"checking", "savings"}
 
+# How many days apart the two sides of a CC payment can post.
+# Banks often post the checking debit and the credit card payment credit
+# on different days (e.g., checking posts Monday, CC posts Wednesday).
+CC_PAYMENT_DATE_WINDOW = 5
+
 
 def detect_cc_payments(conn, verbose=False):
     """Detect credit card payment transfer pairs and categorize them.
 
-    Hybrid: pair-matching (same day, same abs amount, opposite signs,
-    one CC account) gated by description (at least one side must match
-    CC payment patterns). Tags uncategorized matches as Transfer:Credit Card Payment.
+    Matching strategy (all conditions must hold for a pair):
+      1. Same absolute amount (rounded to cents).
+      2. Posted dates within CC_PAYMENT_DATE_WINDOW days of each other.
+         Banks don't always post both sides on the same day — the checking
+         debit and CC payment credit can land days apart.
+      3. Opposite signs (one negative outflow, one positive inflow).
+      4. Exactly one side is a credit card account. This prevents matching
+         two checking-to-checking transfers or two CC-to-CC movements.
+      5. At least one side's description matches CC_PAYMENT_PATTERNS
+         (e.g., "AUTOPAY", "PAYMENT THANK YOU"). This gates the match so
+         we don't pair unrelated same-amount transactions that happen to
+         cross a CC boundary.
+
+    Transactions already categorized are left untouched. Matched
+    uncategorized transactions are tagged "Transfer:Credit Card Payment".
     """
     rows = conn.execute(
         "SELECT t.id, t.posted, t.amount, t.description, t.account_id, a.type, t.category"
@@ -285,14 +305,16 @@ def detect_cc_payments(conn, verbose=False):
         print(f"  Accounts by type: {type_counts}")
         print(f"  Total transactions: {len(rows)}")
 
+    # Group by absolute amount only. Date matching happens per-pair below,
+    # because the two sides can post on different days.
     from collections import defaultdict
 
-    groups = defaultdict(list)
+    by_amount = defaultdict(list)
     for tid, posted, amount, desc, _acct_id, acct_type, category in rows:
-        key = (posted, round(abs(amount), 2))
-        groups[key].append(
+        by_amount[round(abs(amount), 2)].append(
             {
                 "id": tid,
+                "posted": date.fromisoformat(posted) if isinstance(posted, str) else posted,
                 "amount": amount,
                 "description": desc,
                 "type": acct_type,
@@ -304,7 +326,10 @@ def detect_cc_payments(conn, verbose=False):
     tagged = set()
     pairs_found = 0
     rejected_no_cc = 0
-    for (_date, abs_amt), txns in groups.items():
+    rejected_date = 0
+    window = timedelta(days=CC_PAYMENT_DATE_WINDOW)
+
+    for abs_amt, txns in by_amount.items():
         if len(txns) < 2 or abs_amt == 0:
             continue
 
@@ -314,9 +339,22 @@ def detect_cc_payments(conn, verbose=False):
         for neg in negatives:
             for pos in positives:
                 pairs_found += 1
+
+                # Date gate: both sides must post within the window
+                if abs(neg["posted"] - pos["posted"]) > window:
+                    rejected_date += 1
+                    continue
+
+                # Account type gate: exactly one side must be a CC account
                 neg_is_cc = neg["type"] in CC_ACCOUNT_TYPES
                 pos_is_cc = pos["type"] in CC_ACCOUNT_TYPES
 
+                # Account type + description gate:
+                # - Clear case: one side is explicitly CC, the other isn't.
+                #   No description check needed — account types are unambiguous.
+                # - Ambiguous case: one side has NULL type. Require description
+                #   match to confirm it's actually a CC payment.
+                # - Two non-CC accounts: never match.
                 if neg_is_cc ^ pos_is_cc:
                     pass  # clear signal: one CC, one non-CC
                 elif (
@@ -335,14 +373,16 @@ def detect_cc_payments(conn, verbose=False):
                 for t in (neg, pos):
                     if t["id"] not in tagged and t["category"] is None:
                         conn.execute(
-                            "UPDATE transactions SET category = ? WHERE id = ?",
+                            "UPDATE transactions SET category = ?,"
+                            " category_source = 'cc_detect' WHERE id = ?",
                             ("Transfer:Credit Card Payment", t["id"]),
                         )
                         tagged.add(t["id"])
                         count += 1
 
     if verbose:
-        print(f"  Same-day/amount pairs evaluated: {pairs_found}")
+        print(f"  Amount-matched pairs evaluated: {pairs_found}")
+        print(f"  Rejected (dates too far apart): {rejected_date}")
         print(f"  Rejected (no CC account on exactly one side): {rejected_no_cc}")
         print(f"  Tagged: {count}")
 

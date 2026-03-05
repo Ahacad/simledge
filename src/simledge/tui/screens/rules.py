@@ -110,6 +110,7 @@ class RulesScreen(Screen):
         Binding("enter", "edit_rule", "Edit", priority=True),
         Binding("r", "run_rules", "Apply", priority=True),
         Binding("R", "force_apply_rules", "Force Apply", priority=True),
+        Binding("F", "force_all_apply_rules", "Force All", priority=True),
         Binding("t", "test_rules", "Dry Run", priority=True),
         Binding("i", "init_rules", "Init Defaults", priority=True),
     ]
@@ -157,7 +158,9 @@ class RulesScreen(Screen):
         status = f"[dim]{len(self._rules)} rules"
         if not self._rules:
             status += "  |  i: init defaults"
-        status += "  |  n: new  d: delete  Enter: edit  r: apply  R: force apply  t: dry run[/]"
+        status += (
+            "  |  n: new  d: delete  Enter: edit  r: apply  R: force  F: force all  t: dry run[/]"
+        )
         self.query_one("#rules-status", Static).update(status)
 
     def on_resize(self, event):
@@ -228,9 +231,8 @@ class RulesScreen(Screen):
     def action_force_apply_rules(self):
         self.app.push_screen(
             ConfirmModal(
-                "This will clear ALL existing categories\n"
-                "and re-apply rules from scratch.\n\n"
-                "Any manual categorizations will be lost."
+                "This will re-apply rules to all auto-categorized\n"
+                "transactions. Manual categories are preserved."
             ),
             callback=self._on_force_apply_confirm,
         )
@@ -242,12 +244,41 @@ class RulesScreen(Screen):
 
         rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
-        conn.execute("UPDATE transactions SET category = NULL")
+        conn.execute(
+            "UPDATE transactions SET category = NULL, category_source = NULL"
+            " WHERE category_source != 'manual' OR category_source IS NULL"
+        )
         conn.commit()
         count = apply_rules(rules, conn)
         cc_count = detect_cc_payments(conn)
         conn.close()
-        self.app.notify(f"Reset & re-categorized {count} transactions, {cc_count} CC transfers")
+        self.app.notify(
+            f"Re-categorized {count} transactions, {cc_count} CC transfers (kept manual)"
+        )
+
+    def action_force_all_apply_rules(self):
+        self.app.push_screen(
+            ConfirmModal(
+                "This will clear ALL categories including\n"
+                "manual ones and re-apply rules from scratch.\n\n"
+                "All manual categorizations will be lost."
+            ),
+            callback=self._on_force_all_apply_confirm,
+        )
+
+    def _on_force_all_apply_confirm(self, confirmed):
+        if not confirmed:
+            return
+        from simledge.categorize import detect_cc_payments
+
+        rules = load_rules(RULES_PATH)
+        conn = init_db(DB_PATH)
+        conn.execute("UPDATE transactions SET category = NULL, category_source = NULL")
+        conn.commit()
+        count = apply_rules(rules, conn)
+        cc_count = detect_cc_payments(conn)
+        conn.close()
+        self.app.notify(f"Reset ALL & re-categorized {count} transactions, {cc_count} CC transfers")
 
     def action_init_rules(self):
         created = init_rules(RULES_PATH)
