@@ -171,3 +171,32 @@ def test_get_transaction_missing(tmp_path):
     conn = init_db(db_path)
     assert get_transaction(conn, "nonexistent") is None
     conn.close()
+
+
+def test_display_name_migration(tmp_path):
+    from simledge.db import init_db
+
+    db_path = str(tmp_path / "test.db")
+    conn = init_db(db_path)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(accounts)").fetchall()}
+    assert "display_name" in cols
+    conn.close()
+
+
+def test_update_account_display_name(tmp_path):
+    from simledge.db import init_db, update_account_display_name, upsert_account, upsert_institution
+
+    db_path = str(tmp_path / "test.db")
+    conn = init_db(db_path)
+    upsert_institution(conn, "bank-1", "Test Bank", "test.com")
+    upsert_account(conn, "acct-1", "bank-1", "Very Long Account Name", "USD", "checking")
+
+    update_account_display_name(conn, "acct-1", "Checking")
+    row = conn.execute("SELECT display_name FROM accounts WHERE id = ?", ("acct-1",)).fetchone()
+    assert row[0] == "Checking"
+
+    # Clear display name
+    update_account_display_name(conn, "acct-1", "")
+    row = conn.execute("SELECT display_name FROM accounts WHERE id = ?", ("acct-1",)).fetchone()
+    assert row[0] is None
+    conn.close()

@@ -55,6 +55,35 @@ NavBar {
     color: $text-muted;
 }
 
+/* Accounts screen */
+#accounts-panel {
+    height: 1fr;
+}
+
+#accounts-table {
+    height: 1fr;
+}
+
+#accounts-summary {
+    height: 1;
+    padding: 0 1;
+}
+
+#accounts-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#edit-name-input {
+    dock: bottom;
+    height: 3;
+}
+
+#edit-name-input:focus {
+    border: round #2dd4bf;
+}
+
 /* Chart panels */
 #nw-chart, #cf-chart, #spending-chart, #income-chart {
     height: auto;
