@@ -39,6 +39,9 @@ class AccountsScreen(Screen):
     def on_mount(self):
         self._editing = False
         self._edit_account_id = None
+        self.call_after_refresh(self._initial_load)
+
+    def _initial_load(self):
         self._refresh_data()
         self.query_one("#accounts-table", DataTable).focus()
 
