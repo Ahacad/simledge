@@ -90,15 +90,10 @@ class TransactionDetailScreen(ModalScreen):
 
         # Parse initial parent/child
         init_parent = Select.NULL
-        init_child = Select.NULL
         if category_value:
             if ":" in category_value:
-                p, c = category_value.split(":", 1)
-                if p in self._cat_parents:
-                    init_parent = p
-                    init_child = c
-                else:
-                    init_parent = _CUSTOM
+                p, _ = category_value.split(":", 1)
+                init_parent = p if p in self._cat_parents else _CUSTOM
             elif category_value in self._cat_standalone or category_value in self._cat_parents:
                 init_parent = category_value
             else:
