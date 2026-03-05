@@ -44,6 +44,8 @@ class TrendsScreen(Screen):
             yield Vertical(
                 Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel"
             )
+            with Vertical(id="category-spending-panel", classes="panel"):
+                yield Static("", id="category-spending-content")
 
     def on_mount(self):
         self._lookback = 6
@@ -206,3 +208,43 @@ class TrendsScreen(Screen):
             self.query_one("#yoy-category-content", Static).update("\n".join(ylines))
         else:
             yoy_panel.display = False
+
+        # Category spending breakdown
+        cat_panel = self.query_one("#category-spending-panel")
+        cat_panel.border_title = f"Spending by Category — {current_month[5:]}"
+
+        if current_cats:
+            total_spending = sum(abs(c["total"]) for c in current_cats)
+            max_cat = max(abs(c["total"]) for c in current_cats) if current_cats else 1
+            bar_width = 30
+            cat_lines = []
+
+            for group in current_cats:
+                cat = group["category"]
+                amt = abs(group["total"])
+                pct = (amt / total_spending * 100) if total_spending else 0
+                filled = int(bar_width * (amt / max_cat)) if max_cat > 0 else 0
+                bar = f"[#2dd4bf]{chr(0x2588) * filled}[/][#333]{chr(0x2591) * (bar_width - filled)}[/]"
+                cat_lines.append(
+                    f"[bold]{cat:<18}[/] {format_dollar(amt, masked=m):>10}  {bar}  [dim]{pct:>5.1f}%[/]"
+                )
+
+                # Subcategories
+                children = group.get("children", [])
+                for child in children:
+                    sub_name = child["category"].split(":", 1)[1] if ":" in child["category"] else child["category"]
+                    sub_amt = abs(child["total"])
+                    sub_pct = (sub_amt / total_spending * 100) if total_spending else 0
+                    sub_filled = int(bar_width * (sub_amt / max_cat)) if max_cat > 0 else 0
+                    sub_bar = f"[#1a9a8a]{chr(0x2588) * sub_filled}[/][#333]{chr(0x2591) * (bar_width - sub_filled)}[/]"
+                    cat_lines.append(
+                        f"  [dim]{sub_name:<16}[/] {format_dollar(sub_amt, masked=m):>10}  {sub_bar}  [dim]{sub_pct:>5.1f}%[/]"
+                    )
+
+            # Total line
+            cat_lines.append(f"\n[bold]{'Total':<18}[/] {format_dollar(total_spending, masked=m):>10}")
+            self.query_one("#category-spending-content", Static).update("\n".join(cat_lines))
+        else:
+            self.query_one("#category-spending-content", Static).update(
+                "[dim]No spending data this month[/]"
+            )
