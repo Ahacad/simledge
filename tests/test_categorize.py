@@ -194,7 +194,8 @@ def test_detect_cc_payments_tags_pair(tmp_path):
     conn.close()
 
 
-def test_detect_cc_payments_requires_description_match(tmp_path):
+def test_detect_cc_payments_any_description(tmp_path):
+    """Any same-day/same-amount pair with one CC account should match, regardless of description."""
     from simledge.categorize import detect_cc_payments
     from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
@@ -202,13 +203,11 @@ def test_detect_cc_payments_requires_description_match(tmp_path):
     upsert_institution(conn, "org-1", "Bank", None)
     upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
     upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
-    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -75.00, "WHOLE FOODS")
-    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-01", 75.00, "AMAZON REFUND")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -75.00, "CHASE EPAY")
+    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-01", 75.00, "ELECTRONIC PMT")
 
     count = detect_cc_payments(conn)
-    assert count == 0
-    cat_out = conn.execute("SELECT category FROM transactions WHERE id='txn-out'").fetchone()[0]
-    assert cat_out is None
+    assert count == 2
     conn.close()
 
 
@@ -250,17 +249,18 @@ def test_detect_cc_payments_skips_already_categorized(tmp_path):
     conn.close()
 
 
-def test_detect_cc_payments_description_on_one_side_only(tmp_path):
+def test_detect_cc_payments_no_match_without_cc_account(tmp_path):
+    """Same-day/same-amount pair between two non-CC accounts should NOT match."""
     from simledge.categorize import detect_cc_payments
     from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
 
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
     upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
-    upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
-    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -1200.00, "ACH DEBIT CHASE")
-    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-01", 1200.00, "AUTOPAY PAYMENT")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -1200.00, "TRANSFER TO SAVINGS")
+    upsert_transaction(conn, "txn-in", "acct-sav", "2026-03-01", 1200.00, "TRANSFER FROM CHECKING")
 
     count = detect_cc_payments(conn)
-    assert count == 2
+    assert count == 0
     conn.close()

@@ -36,6 +36,7 @@ def main():
     rule_sub.add_parser("test", help="dry-run rules against uncategorized")
     apply_p = rule_sub.add_parser("apply", help="apply rules + CC detection to existing data")
     apply_p.add_argument("--force", action="store_true", help="reset all categories first")
+    apply_p.add_argument("--verbose", action="store_true", help="show detection diagnostics")
 
     args = parser.parse_args()
 
@@ -215,7 +216,7 @@ def _run_rule(args):
             conn.commit()
             print("Reset all categories.")
         count = apply_rules(rules, conn)
-        cc_count = detect_cc_payments(conn)
+        cc_count = detect_cc_payments(conn, verbose=args.verbose)
         conn.close()
         print(f"Categorized {count} transactions, detected {cc_count} CC payment transfers.")
     else:

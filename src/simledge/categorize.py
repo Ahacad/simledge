@@ -264,7 +264,7 @@ CC_PAYMENT_PATTERNS = re.compile(
 CC_ACCOUNT_TYPES = {"credit", "credit_card"}
 
 
-def detect_cc_payments(conn):
+def detect_cc_payments(conn, verbose=False):
     """Detect credit card payment transfer pairs and categorize them.
 
     Hybrid: pair-matching (same day, same abs amount, opposite signs,
@@ -276,6 +276,13 @@ def detect_cc_payments(conn):
         " FROM transactions t"
         " JOIN accounts a ON t.account_id = a.id"
     ).fetchall()
+
+    if verbose:
+        type_counts = {}
+        for *_, acct_type, _ in rows:
+            type_counts[acct_type or "NULL"] = type_counts.get(acct_type or "NULL", 0) + 1
+        print(f"  Accounts by type: {type_counts}")
+        print(f"  Total transactions: {len(rows)}")
 
     from collections import defaultdict
 
@@ -289,6 +296,8 @@ def detect_cc_payments(conn):
 
     count = 0
     tagged = set()
+    pairs_found = 0
+    rejected_no_cc = 0
     for (_date, abs_amt), txns in groups.items():
         if len(txns) < 2 or abs_amt == 0:
             continue
@@ -298,13 +307,11 @@ def detect_cc_payments(conn):
 
         for neg in negatives:
             for pos in positives:
+                pairs_found += 1
                 neg_is_cc = neg["type"] in CC_ACCOUNT_TYPES
                 pos_is_cc = pos["type"] in CC_ACCOUNT_TYPES
                 if not (neg_is_cc ^ pos_is_cc):
-                    continue
-
-                if not (CC_PAYMENT_PATTERNS.search(neg["description"])
-                        or CC_PAYMENT_PATTERNS.search(pos["description"])):
+                    rejected_no_cc += 1
                     continue
 
                 for t in (neg, pos):
@@ -315,6 +322,11 @@ def detect_cc_payments(conn):
                         )
                         tagged.add(t["id"])
                         count += 1
+
+    if verbose:
+        print(f"  Same-day/amount pairs evaluated: {pairs_found}")
+        print(f"  Rejected (no CC account on exactly one side): {rejected_no_cc}")
+        print(f"  Tagged: {count}")
 
     conn.commit()
     log.info("detected %d credit card payment transactions", count)
