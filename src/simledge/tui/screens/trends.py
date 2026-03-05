@@ -17,7 +17,7 @@ from simledge.analysis import (
 )
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.tui.charts import GREEN, TEAL, render_bar_chart
+from simledge.tui.charts import GREEN, TEAL, render_bar_chart, render_data_table
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -33,11 +33,13 @@ class TrendsScreen(Screen):
         with VerticalScroll():
             with Vertical(id="chart-panel", classes="panel"):
                 yield Static("", id="spending-chart")
+                yield Static("", id="spending-data-table")
             yield Vertical(
                 Static("", id="comparison-content"), id="comparison-panel", classes="panel"
             )
             with Vertical(id="income-panel", classes="panel"):
                 yield Static("", id="income-chart")
+                yield Static("", id="income-data-table")
                 yield Static("", id="income-sources")
             yield Vertical(
                 Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel"
@@ -89,10 +91,13 @@ class TrendsScreen(Screen):
             w = max(40, self.app.size.width - 8)
             chart = render_bar_chart(values, month_labels, width=w, height=12, color=TEAL)
             self.query_one("#spending-chart", Static).update(chart)
+            data_tbl = render_data_table(month_labels, values, width=w)
+            self.query_one("#spending-data-table", Static).update(data_tbl)
             self.query_one("#chart-panel").border_title = f"Monthly Spending ({self._lookback}mo)"
         else:
             self.query_one("#chart-panel").border_title = f"Monthly Spending ({self._lookback}mo)"
             self.query_one("#spending-chart", Static).update("[dim]No data yet[/]")
+            self.query_one("#spending-data-table", Static).update("")
 
         # Category comparison
         self.query_one("#comparison-panel").border_title = f"{prev_month[5:]} → {current_month[5:]}"
@@ -128,8 +133,11 @@ class TrendsScreen(Screen):
             w = max(40, self.app.size.width - 8)
             chart = render_bar_chart(inc_values, inc_labels, width=w, height=12, color=GREEN)
             self.query_one("#income-chart", Static).update(chart)
+            data_tbl = render_data_table(inc_labels, inc_values, width=w)
+            self.query_one("#income-data-table", Static).update(data_tbl)
         else:
             self.query_one("#income-chart", Static).update("[dim]No income data yet[/]")
+            self.query_one("#income-data-table", Static).update("")
 
         if inc_cats:
             total_inc = sum(c["total"] for c in inc_cats)

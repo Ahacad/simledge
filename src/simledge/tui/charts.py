@@ -8,6 +8,17 @@ GREEN = (34, 197, 94)
 RED = (239, 68, 68)
 
 
+def _fmt_dollar(v):
+    """Short dollar format for chart labels."""
+    if abs(v) >= 1_000_000:
+        return f"${v / 1_000_000:.1f}M"
+    elif abs(v) >= 10_000:
+        return f"${v / 1_000:.0f}k"
+    elif abs(v) >= 1_000:
+        return f"${v / 1_000:.1f}k"
+    return f"${v:,.0f}"
+
+
 def _dollar_yticks(values):
     """Set Y-axis ticks formatted as dollars."""
     if not values:
@@ -15,22 +26,13 @@ def _dollar_yticks(values):
     max_val = max(abs(v) for v in values)
     min_val = min(values)
 
-    def fmt(v):
-        if max_val >= 1_000_000:
-            return f"${v / 1_000_000:.1f}M"
-        elif max_val >= 10_000:
-            return f"${v / 1_000:.0f}k"
-        elif max_val >= 1_000:
-            return f"${v / 1_000:.1f}k"
-        return f"${v:,.0f}"
-
     span = max_val - min_val
     if span == 0:
-        plt.yticks([max_val], [fmt(max_val)])
+        plt.yticks([max_val], [_fmt_dollar(max_val)])
         return
     step = span / 4
     ticks = [min_val + step * i for i in range(5)]
-    plt.yticks(ticks, [fmt(v) for v in ticks])
+    plt.yticks(ticks, [_fmt_dollar(v) for v in ticks])
 
 
 def _sparse_xticks(labels):
@@ -61,13 +63,36 @@ def render_line_chart(values, labels, width=80, height=12, color=TEAL):
 
 
 def render_bar_chart(values, labels, width=80, height=12, color=TEAL):
-    """Render a bar chart, return Rich Text."""
+    """Render a bar chart with value labels above each bar, return Rich Text."""
     if not values:
         return Text("No data")
     plt.clear_figure()
     plt.theme("dark")
     plt.bar(labels, values, color=color)
     _dollar_yticks(values)
-    plt.plotsize(width, height)
+
+    # Add value labels above each bar
+    max_val = max(abs(v) for v in values) if values else 1
+    offset = max_val * 0.03  # small offset above bar top
+    for i, v in enumerate(values):
+        plt.text(_fmt_dollar(v), i + 1, v + offset, alignment="center", color=color)
+
+    plt.plotsize(width, height + 2)  # extra height for labels
     canvas = plt.build()
     return Text.from_ansi(canvas)
+
+
+def render_data_table(labels, values, width=80):
+    """Render a compact single-row data table below a chart.
+
+    Returns a Rich markup string with labels and values aligned.
+    """
+    if not labels or not values:
+        return ""
+    col_width = max(8, width // len(labels))
+    header = ""
+    row = ""
+    for label, val in zip(labels, values, strict=False):
+        header += f"[dim]{label:^{col_width}}[/]"
+        row += f"[bold]{_fmt_dollar(val):^{col_width}}[/]"
+    return f"{header}\n{row}"
