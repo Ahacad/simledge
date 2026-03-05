@@ -133,7 +133,6 @@ class TransactionsScreen(Screen):
     BINDINGS = [
         ("slash", "focus_search", "/ Search"),
         ("escape", "clear_or_blur", "Esc Back"),
-        ("enter", "open_detail", "Enter Detail"),
         Binding("f", "open_filters", "f Filters", show=False),
         Binding("g", "filter_tag", "g Tag filter", show=False),
         Binding("h", "prev_month", "Prev month", show=False),
@@ -350,12 +349,8 @@ class TransactionsScreen(Screen):
             del self._filters["tag"]
         self._reload()
 
-    def action_open_detail(self):
-        table = self.query_one("#txn-table", DataTable)
-        if table.cursor_row is None or table.row_count == 0:
-            return
-        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-        txn_id = str(row_key)
+    def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        txn_id = str(event.row_key.value)
         conn = init_db(DB_PATH)
         txn = get_transaction(conn, txn_id)
         tags = get_transaction_tags(conn, txn_id)
