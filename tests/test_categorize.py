@@ -9,7 +9,7 @@ def test_init_rules_creates_file(tmp_path):
     assert path.exists()
     content = path.read_text()
     assert "[[rules]]" in content
-    assert "Food:Groceries" in content
+    assert '"Groceries"' in content
 
 
 def test_init_rules_does_not_overwrite(tmp_path):

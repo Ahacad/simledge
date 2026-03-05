@@ -78,12 +78,38 @@ class RuleModal(ModalScreen):
         self.dismiss(None)
 
 
+class ConfirmModal(ModalScreen):
+    """Yes/no confirmation modal."""
+
+    BINDINGS = [
+        Binding("y", "confirm", "Yes", priority=True),
+        Binding("n", "cancel", "No", priority=True),
+        Binding("escape", "cancel", "Cancel", priority=True),
+    ]
+
+    def __init__(self, message):
+        super().__init__()
+        self._message = message
+
+    def compose(self) -> ComposeResult:
+        with Middle(), Center(), Vertical(id="confirm-modal-box"):
+            yield Static(f"[bold red]⚠ Warning[/]\n\n{self._message}", id="confirm-msg")
+            yield Static("[dim]y: confirm  n/Esc: cancel[/]", id="confirm-hint")
+
+    def action_confirm(self):
+        self.dismiss(True)
+
+    def action_cancel(self):
+        self.dismiss(False)
+
+
 class RulesScreen(Screen):
     BINDINGS = [
         Binding("n", "new_rule", "New", priority=True),
         Binding("d", "delete_rule", "Delete", priority=True),
         Binding("enter", "edit_rule", "Edit", priority=True),
         Binding("r", "run_rules", "Apply", priority=True),
+        Binding("R", "force_apply_rules", "Force Apply", priority=True),
         Binding("t", "test_rules", "Dry Run", priority=True),
         Binding("i", "init_rules", "Init Defaults", priority=True),
     ]
@@ -122,7 +148,7 @@ class RulesScreen(Screen):
         status = f"[dim]{len(self._rules)} rules"
         if not self._rules:
             status += "  |  i: init defaults"
-        status += "  |  n: new  d: delete  Enter: edit  r: apply  t: dry run[/]"
+        status += "  |  n: new  d: delete  Enter: edit  r: apply  R: force apply  t: dry run[/]"
         self.query_one("#rules-status", Static).update(status)
 
     def _get_selected_index(self):
@@ -186,6 +212,27 @@ class RulesScreen(Screen):
         count = apply_rules(rules, conn, dry_run=True)
         conn.close()
         self.app.notify(f"Would categorize {count} transactions")
+
+    def action_force_apply_rules(self):
+        self.app.push_screen(
+            ConfirmModal(
+                "This will clear ALL existing categories\n"
+                "and re-apply rules from scratch.\n\n"
+                "Any manual categorizations will be lost."
+            ),
+            callback=self._on_force_apply_confirm,
+        )
+
+    def _on_force_apply_confirm(self, confirmed):
+        if not confirmed:
+            return
+        rules = load_rules(RULES_PATH)
+        conn = init_db(DB_PATH)
+        conn.execute("UPDATE transactions SET category = NULL")
+        conn.commit()
+        count = apply_rules(rules, conn)
+        conn.close()
+        self.app.notify(f"Reset & re-categorized {count} transactions")
 
     def action_init_rules(self):
         created = init_rules(RULES_PATH)

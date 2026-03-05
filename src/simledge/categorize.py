@@ -9,12 +9,13 @@ from simledge.log import setup_logging
 log = setup_logging("simledge.categorize")
 
 DEFAULT_RULES = [
-    # Food
+    # Groceries (top-level)
     {
         "pattern": "SAFEWAY|TRADER JOE|WHOLE FOODS|QFC|KROGER|ALDI|COSTCO|WALMART.*GROCERY|FRED MEYER|WINCO|PUBLIX|H.E.B|WEGMANS|SPROUTS",
-        "category": "Food:Groceries",
+        "category": "Groceries",
         "priority": 0,
     },
+    # Food
     {
         "pattern": "DOORDASH|GRUBHUB|UBER EATS|CHIPOTLE|MCDONALD|STARBUCKS|SUBWAY|TACO BELL|CHICK-FIL|PANDA EXPRESS|PANERA|WENDY|BURGER KING|DOMINO|PIZZA HUT|FIVE GUYS|SHAKE SHACK|IN.N.OUT|POPEYES|WINGSTOP|JACK IN THE BOX",
         "category": "Food:Dining",
@@ -26,6 +27,11 @@ DEFAULT_RULES = [
         "priority": 5,
     },
     # Housing
+    {
+        "pattern": "BILT|RENT|LEASE.*PAY",
+        "category": "Housing:Rent",
+        "priority": 0,
+    },
     {
         "pattern": "COMCAST|XFINITY|SPECTRUM|AT.T.*INTERNET|VERIZON.*FIOS|CENTURYLINK|T-MOBILE.*HOME",
         "category": "Housing:Internet",

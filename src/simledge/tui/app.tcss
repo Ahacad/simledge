@@ -202,6 +202,29 @@ RuleModal {
     text-align: center;
 }
 
+/* Confirm modal */
+ConfirmModal {
+    align: center middle;
+}
+
+#confirm-modal-box {
+    width: 50;
+    height: auto;
+    padding: 1 2;
+    border: round #ef4444;
+    background: $surface;
+}
+
+#confirm-msg {
+    margin: 0 0 1 0;
+    text-align: center;
+}
+
+#confirm-hint {
+    height: 1;
+    text-align: center;
+}
+
 /* Account filter modal */
 AccountFilterModal {
     align: center middle;
