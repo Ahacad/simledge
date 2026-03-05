@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 _EXCLUDE_CC = " AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
+_EXCLUDE_TRANSFERS = " AND (category IS NULL OR category NOT LIKE 'Transfer%')"
 
 
 def _account_filter(account_ids, table_prefix="", column=None):
@@ -22,6 +23,7 @@ def spending_by_category(conn, month, account_ids=None):
         "SELECT COALESCE(category, 'uncategorized') as cat, SUM(amount) as total"
         " FROM transactions"
         " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
+        + _EXCLUDE_TRANSFERS
         + filt
         + " GROUP BY cat ORDER BY total ASC",
         [month, *filt_params],
@@ -34,7 +36,9 @@ def monthly_summary(conn, month, account_ids=None):
     filt, filt_params = _account_filter(account_ids, table_prefix="t.")
     row = conn.execute(
         "SELECT"
-        " COALESCE(SUM(CASE WHEN t.amount < 0 THEN t.amount END), 0),"
+        " COALESCE(SUM(CASE WHEN t.amount < 0"
+        "   AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
+        "   THEN t.amount END), 0),"
         " COALESCE(SUM(CASE WHEN t.amount > 0"
         "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
         "   THEN t.amount END), 0)"
@@ -85,11 +89,44 @@ def spending_trend(conn, months=6, account_ids=None):
     rows = conn.execute(
         "SELECT strftime('%Y-%m', posted) as month, SUM(amount) as total"
         " FROM transactions WHERE amount < 0 AND posted >= ?"
+        + _EXCLUDE_TRANSFERS
         + filt
         + " GROUP BY month ORDER BY month",
         [start_str, *filt_params],
     ).fetchall()
     return [{"month": r[0], "total": r[1]} for r in rows]
+
+
+def daily_average_spending(conn, month, account_ids=None):
+    """Return average daily spending for a YYYY-MM month."""
+    filt, filt_params = _account_filter(account_ids)
+    row = conn.execute(
+        "SELECT COALESCE(SUM(amount), 0), COUNT(DISTINCT posted)"
+        " FROM transactions"
+        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
+        + _EXCLUDE_TRANSFERS
+        + filt,
+        [month, *filt_params],
+    ).fetchone()
+    total, days = row[0], row[1]
+    if days == 0:
+        return 0.0
+    return round(abs(total) / days, 2)
+
+
+def top_merchants(conn, month, limit=10, account_ids=None):
+    """Return top merchants by spending for a YYYY-MM month."""
+    filt, filt_params = _account_filter(account_ids)
+    rows = conn.execute(
+        "SELECT description, SUM(amount) as total, COUNT(*) as txn_count"
+        " FROM transactions"
+        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
+        + _EXCLUDE_TRANSFERS
+        + filt
+        + " GROUP BY description ORDER BY total ASC LIMIT ?",
+        [month, *filt_params, limit],
+    ).fetchall()
+    return [{"merchant": r[0], "total": r[1], "count": r[2]} for r in rows]
 
 
 def income_by_category(conn, month, account_ids=None):
@@ -256,7 +293,9 @@ def ytd_comparison(conn, account_ids=None):
     def _ytd_totals(year):
         row = conn.execute(
             "SELECT"
-            " COALESCE(SUM(CASE WHEN t.amount < 0 THEN t.amount END), 0),"
+            " COALESCE(SUM(CASE WHEN t.amount < 0"
+            "   AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
+            "   THEN t.amount END), 0),"
             " COALESCE(SUM(CASE WHEN t.amount > 0"
             "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
             "   THEN t.amount END), 0)"
