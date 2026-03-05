@@ -109,7 +109,7 @@ TransactionDetailScreen {
 }
 
 #txn-detail-box {
-    width: 60;
+    width: 70;
     height: auto;
     padding: 1 2;
     border: round #2dd4bf;
@@ -126,12 +126,23 @@ TransactionDetailScreen {
     margin: 1 0 0 0;
 }
 
-#txn-category-select {
-    margin: 0 0 0 0;
+#category-selects {
+    height: auto;
+    margin: 0;
+}
+
+#txn-cat-parent {
+    width: 1fr;
+    margin: 0 1 0 0;
+}
+
+#txn-cat-child {
+    width: 1fr;
+    margin: 0;
 }
 
 #txn-category-custom {
-    margin: 0 0 0 0;
+    margin: 0;
 }
 
 #txn-category-custom:focus {
