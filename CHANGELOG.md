@@ -2,6 +2,42 @@
 
 ### Bug Fixes
 
+- Fix Enter key on transactions table ([1c33931](https://github.com/Ahacad/simledge/commit/1c339319265712af273b401c5af101aecc30a153))
+- Set DataTable cursor_type to row for Enter to work ([1f1151d](https://github.com/Ahacad/simledge/commit/1f1151d1bc00dfada9487550631f3f158b811cbf))
+- Correct hint text — Right arrow accepts suggestion, not Tab ([0df011d](https://github.com/Ahacad/simledge/commit/0df011db5862dcaa134fc62504ec1a333a7ac7ce))
+- Use Select.NULL instead of Select.BLANK for no-selection ([d179536](https://github.com/Ahacad/simledge/commit/d1795365984844e54f7e1f9caa828ef9a4165b76))
+- Category colors, chart exact numbers, trends arrow direction, rules flex columns, budget TOML init ([a87876a](https://github.com/Ahacad/simledge/commit/a87876af7e3fcb74446ae4279fb43f75258b32d7))
+- Exclude Transfer categories from spending totals ([5d15405](https://github.com/Ahacad/simledge/commit/5d15405b029d3b024be45b05c595cd92b99d21b8))
+- Detect CC payment transfers, exclude from spending totals ([c00ea1c](https://github.com/Ahacad/simledge/commit/c00ea1c2c6b4d2a35ed24b4f791945d3d6e27d5d))
+- Wire CC payment detection into force-apply and new `rule apply` CLI ([ee3a4b0](https://github.com/Ahacad/simledge/commit/ee3a4b0573f8549f8a635fa91ea15698c671f2e4))
+- Drop description gate from CC payment detection ([b672cbf](https://github.com/Ahacad/simledge/commit/b672cbfa6902b2c2f8c56641024694581aeddb30))
+- Handle CC accounts with NULL type via description fallback ([e97df87](https://github.com/Ahacad/simledge/commit/e97df875640ed0421099b4da54c6b2833a08934b))
+- Use Select.NULL instead of Select.BLANK for type selector ([828b158](https://github.com/Ahacad/simledge/commit/828b158aaa26acb236f5805f07337e97cd7eb471))
+- Defer data load to after first render frame ([3501cc8](https://github.com/Ahacad/simledge/commit/3501cc82c5eb4830c7a1bd228fc15bb832dff70d))
+
+### Features
+
+- Add RULES_PATH constant for category rules file ([8f80160](https://github.com/Ahacad/simledge/commit/8f801604e7b85b11dac6527774da670bcd084ca5))
+- Rewrite rule engine to use TOML file as source of truth ([aeafa13](https://github.com/Ahacad/simledge/commit/aeafa13e41e74de3c78772e15e4c009da920f3e6))
+- Auto-apply category rules from TOML after sync ([cebe959](https://github.com/Ahacad/simledge/commit/cebe959ad07d90680573ab4f8a38b8023bc166e3))
+- Rewrite rule commands to use TOML file ([f4d0654](https://github.com/Ahacad/simledge/commit/f4d0654cb2e33f17b99781ec5f405a77778300af))
+- Rewrite Rules screen to use TOML file ([e5f4a84](https://github.com/Ahacad/simledge/commit/e5f4a846bf07d7317bd48bf33f0bad5321e45715))
+- TOML-based category rules with preset defaults ([f70c483](https://github.com/Ahacad/simledge/commit/f70c483f3ddc20b532e0a798b06fc9263c1f30ca))
+- Rewrite Accounts screen with DataTable and editable display names ([9c6a05f](https://github.com/Ahacad/simledge/commit/9c6a05f36b3b7d0d3ec76486cb4193dde1619175))
+- Add value labels on chart bars and data tables below charts ([3e5f84d](https://github.com/Ahacad/simledge/commit/3e5f84d94a18f7c84f6498e7ee354800bb1e59e2))
+- Use display_name for accounts in transactions and filter modal ([36ed3f0](https://github.com/Ahacad/simledge/commit/36ed3f0240ccc4d2ce360f1ea79b84c976651bae))
+- Add spending by category panel with subcategory breakdown ([caa9cb3](https://github.com/Ahacad/simledge/commit/caa9cb3667181326a58a7fa7c77252a9ca127416))
+- Add category autocomplete and rule-based prefill ([961138d](https://github.com/Ahacad/simledge/commit/961138df51de4e6c8b9b7025db89b4aaaacef593))
+- Replace category input with Select dropdown + custom option ([85e0c1b](https://github.com/Ahacad/simledge/commit/85e0c1b3bcb88058c65c3ebb17180e474487957b))
+- Two-stage category selection — parent then subcategory ([6c147a9](https://github.com/Ahacad/simledge/commit/6c147a9847098fed3d88a95405861dba633e572e))
+- Promote Groceries to top-level category, add Housing:Rent, add force-apply action ([627976b](https://github.com/Ahacad/simledge/commit/627976b03d34a4e3e4e57dba2135414e592c87d9))
+- Enrich overview, fix YoY arrows, color categories, cap rule widths, migrate budgets to TOML ([0b95841](https://github.com/Ahacad/simledge/commit/0b95841485478abf5cdee1158b2d45ceb614f3a9))
+- Detect CC payment transfer pairs ([9034c2c](https://github.com/Ahacad/simledge/commit/9034c2cd2072ff2a0a5e44158bb2cea64e32f3a5))
+- Add account type editing with 't' key ([b2358b7](https://github.com/Ahacad/simledge/commit/b2358b740357df3e0904c71d09872745865e9491))
+- Add Loan account type option ([09df571](https://github.com/Ahacad/simledge/commit/09df5713baf8a4f8a99515c6507c0ac3025dcc94))
+
+### Bug Fixes
+
 - Extract f-string backslash expressions for Python 3.11 compat ([4432d15](https://github.com/Ahacad/simledge/commit/4432d158ddad0abf2be56917e624b6b933238258))
 - Fix input focus trap, add navbar, add escape to leave search ([a85d958](https://github.com/Ahacad/simledge/commit/a85d95899caaf2047dd1568b1d603b5851f6cd1a))
 - Fix plotext chart rendering, add help screen, disable command palette ([dd88690](https://github.com/Ahacad/simledge/commit/dd88690ffcf07e558b306c77aa14dab9bcda9337))
