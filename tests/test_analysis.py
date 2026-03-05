@@ -477,11 +477,21 @@ def test_spending_excludes_cc_payment_transfers(tmp_path):
         conn, "t1", "acct-1", "2026-03-01", -50.00, "WHOLE FOODS", category="Groceries"
     )
     upsert_transaction(
-        conn, "t2", "acct-1", "2026-03-01", -2000.00, "AUTOPAY",
+        conn,
+        "t2",
+        "acct-1",
+        "2026-03-01",
+        -2000.00,
+        "AUTOPAY",
         category="Transfer:Credit Card Payment",
     )
     upsert_transaction(
-        conn, "t3", "acct-2", "2026-03-01", 2000.00, "PAYMENT THANK YOU",
+        conn,
+        "t3",
+        "acct-2",
+        "2026-03-01",
+        2000.00,
+        "PAYMENT THANK YOU",
         category="Transfer:Credit Card Payment",
     )
     upsert_transaction(
@@ -521,11 +531,14 @@ def test_ytd_excludes_transfers(tmp_path):
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
 
+    upsert_transaction(conn, "t1", "acct-1", "2026-03-01", -100.00, "GROCERY", category="Groceries")
     upsert_transaction(
-        conn, "t1", "acct-1", "2026-03-01", -100.00, "GROCERY", category="Groceries"
-    )
-    upsert_transaction(
-        conn, "t2", "acct-1", "2026-03-01", -1500.00, "CC AUTOPAY",
+        conn,
+        "t2",
+        "acct-1",
+        "2026-03-01",
+        -1500.00,
+        "CC AUTOPAY",
         category="Transfer:Credit Card Payment",
     )
 

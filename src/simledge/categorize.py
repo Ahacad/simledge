@@ -290,10 +290,15 @@ def detect_cc_payments(conn, verbose=False):
     groups = defaultdict(list)
     for tid, posted, amount, desc, _acct_id, acct_type, category in rows:
         key = (posted, round(abs(amount), 2))
-        groups[key].append({
-            "id": tid, "amount": amount, "description": desc,
-            "type": acct_type, "category": category,
-        })
+        groups[key].append(
+            {
+                "id": tid,
+                "amount": amount,
+                "description": desc,
+                "type": acct_type,
+                "category": category,
+            }
+        )
 
     count = 0
     tagged = set()
@@ -314,9 +319,14 @@ def detect_cc_payments(conn, verbose=False):
 
                 if neg_is_cc ^ pos_is_cc:
                     pass  # clear signal: one CC, one non-CC
-                elif (neg["type"] in _KNOWN_NON_CC_TYPES and pos["type"] is None
-                      and (CC_PAYMENT_PATTERNS.search(neg["description"])
-                           or CC_PAYMENT_PATTERNS.search(pos["description"]))):
+                elif (
+                    neg["type"] in _KNOWN_NON_CC_TYPES
+                    and pos["type"] is None
+                    and (
+                        CC_PAYMENT_PATTERNS.search(neg["description"])
+                        or CC_PAYMENT_PATTERNS.search(pos["description"])
+                    )
+                ):
                     pass  # known non-CC + unknown type, description confirms CC payment
                 else:
                     rejected_no_cc += 1

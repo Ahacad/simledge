@@ -70,9 +70,7 @@ def load_budgets(path):
     for b in raw:
         if "category" not in b or "monthly_limit" not in b:
             continue
-        budgets.append(
-            {"category": b["category"], "monthly_limit": float(b["monthly_limit"])}
-        )
+        budgets.append({"category": b["category"], "monthly_limit": float(b["monthly_limit"])})
     return budgets
 
 

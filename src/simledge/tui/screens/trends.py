@@ -232,7 +232,11 @@ class TrendsScreen(Screen):
                 # Subcategories
                 children = group.get("children", [])
                 for child in children:
-                    sub_name = child["category"].split(":", 1)[1] if ":" in child["category"] else child["category"]
+                    sub_name = (
+                        child["category"].split(":", 1)[1]
+                        if ":" in child["category"]
+                        else child["category"]
+                    )
                     sub_amt = abs(child["total"])
                     sub_pct = (sub_amt / total_spending * 100) if total_spending else 0
                     sub_filled = int(bar_width * (sub_amt / max_cat)) if max_cat > 0 else 0
@@ -242,7 +246,9 @@ class TrendsScreen(Screen):
                     )
 
             # Total line
-            cat_lines.append(f"\n[bold]{'Total':<18}[/] {format_dollar(total_spending, masked=m):>10}")
+            cat_lines.append(
+                f"\n[bold]{'Total':<18}[/] {format_dollar(total_spending, masked=m):>10}"
+            )
             self.query_one("#category-spending-content", Static).update("\n".join(cat_lines))
         else:
             self.query_one("#category-spending-content", Static).update(

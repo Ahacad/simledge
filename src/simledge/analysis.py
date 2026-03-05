@@ -103,9 +103,7 @@ def daily_average_spending(conn, month, account_ids=None):
     row = conn.execute(
         "SELECT COALESCE(SUM(amount), 0), COUNT(DISTINCT posted)"
         " FROM transactions"
-        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
-        + _EXCLUDE_TRANSFERS
-        + filt,
+        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0" + _EXCLUDE_TRANSFERS + filt,
         [month, *filt_params],
     ).fetchone()
     total, days = row[0], row[1]
@@ -236,8 +234,7 @@ def uncategorized_count(conn, month, account_ids=None):
     filt, filt_params = _account_filter(account_ids)
     row = conn.execute(
         "SELECT COUNT(*) FROM transactions"
-        " WHERE strftime('%Y-%m', posted) = ? AND category IS NULL"
-        + filt,
+        " WHERE strftime('%Y-%m', posted) = ? AND category IS NULL" + filt,
         [month, *filt_params],
     ).fetchone()
     return row[0]

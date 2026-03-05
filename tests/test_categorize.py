@@ -260,11 +260,20 @@ def test_detect_cc_payments_null_type_with_payment_description(tmp_path):
     upsert_account(conn, "acct-cfu", "org-1", "Chase Freedom Unlimited", "USD", None)
 
     upsert_transaction(
-        conn, "txn-out", "acct-chk", "2026-03-01", -2000.00,
+        conn,
+        "txn-out",
+        "acct-chk",
+        "2026-03-01",
+        -2000.00,
         "PAYMENT TO CHASE CARD ENDING IN 2348",
     )
     upsert_transaction(
-        conn, "txn-in", "acct-cfu", "2026-03-01", 2000.00, "PAYMENT-THANK YOU",
+        conn,
+        "txn-in",
+        "acct-cfu",
+        "2026-03-01",
+        2000.00,
+        "PAYMENT-THANK YOU",
     )
 
     count = detect_cc_payments(conn)
