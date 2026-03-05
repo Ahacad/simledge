@@ -1,14 +1,44 @@
 """Transaction detail modal — view and edit category/notes."""
 
+import re
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Middle, Vertical
 from textual.screen import ModalScreen
+from textual.suggester import SuggestFromList
 from textual.widgets import Input, Static
 
-from simledge.config import DB_PATH
+from simledge.categorize import load_rules
+from simledge.config import DB_PATH, RULES_PATH
 from simledge.db import init_db, update_transaction_field
 from simledge.tags import set_transaction_tags
+
+
+def _get_category_suggestions(conn):
+    """Get all known categories from DB transactions and rules file."""
+    db_cats = conn.execute(
+        "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL ORDER BY category"
+    ).fetchall()
+    categories = {r[0] for r in db_cats}
+    for rule in load_rules(RULES_PATH):
+        categories.add(rule["category"])
+    return sorted(categories)
+
+
+def _suggest_from_rules(description):
+    """Try to match a description against rules, return best category or empty string."""
+    rules = load_rules(RULES_PATH)
+    sorted_rules = sorted(rules, key=lambda r: r.get("priority", 0), reverse=True)
+    for rule in sorted_rules:
+        pattern = rule["pattern"]
+        try:
+            if re.search(pattern, description, re.IGNORECASE):
+                return rule["category"]
+        except re.error:
+            if pattern.upper() in description.upper():
+                return rule["category"]
+    return ""
 
 
 class TransactionDetailScreen(ModalScreen):
@@ -25,6 +55,18 @@ class TransactionDetailScreen(ModalScreen):
         t = self.txn
         color = "#22c55e" if t["amount"] > 0 else "#ef4444"
         status = "Pending" if t["pending"] else "Posted"
+
+        # Build category suggestions and prefill
+        conn = init_db(DB_PATH)
+        suggestions = _get_category_suggestions(conn)
+        conn.close()
+        suggester = SuggestFromList(suggestions, case_sensitive=False)
+
+        # Prefill: use existing category, or try rules match
+        category_value = t["category"]
+        if not category_value and t.get("description"):
+            category_value = _suggest_from_rules(t["description"])
+
         with Middle(), Center(), Vertical(id="txn-detail-box"):
             yield Static(
                 f"[bold]{t['description']}[/]\n\n"
@@ -37,8 +79,9 @@ class TransactionDetailScreen(ModalScreen):
             )
             yield Static("[dim]Category[/]", classes="field-label")
             yield Input(
-                value=t["category"],
-                placeholder="Enter category...",
+                value=category_value,
+                placeholder="Enter category (Tab to accept suggestion)...",
+                suggester=suggester,
                 id="txn-category",
             )
             yield Static("[dim]Notes[/]", classes="field-label")
@@ -54,8 +97,7 @@ class TransactionDetailScreen(ModalScreen):
                 id="txn-tags",
             )
             yield Static(
-                "[dim]Category: max 100 chars  |  Notes: max 500 chars  |  Tags: comma-separated, max 50 each\n"
-                "Enter[/] save  [dim]Esc[/] cancel",
+                "[dim]Tab[/] accept suggestion  [dim]Enter[/] save  [dim]Esc[/] cancel",
                 id="txn-detail-hint",
             )
 
