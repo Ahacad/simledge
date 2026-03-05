@@ -10,7 +10,7 @@ from simledge.analysis import net_worth_history
 from simledge.cashflow import project_balances
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.tui.charts import GREEN, TEAL, render_line_chart
+from simledge.tui.charts import GREEN, TEAL, render_data_table, render_line_chart
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -26,6 +26,7 @@ class NetWorthScreen(Screen):
         with VerticalScroll():
             with Vertical(id="nw-chart-panel", classes="panel"):
                 yield Static("", id="nw-chart")
+                yield Static("", id="nw-data-table")
             yield Vertical(Static("", id="nw-summary"), id="nw-summary-panel", classes="panel")
             with Vertical(id="cf-panel", classes="panel"):
                 yield Static("", id="cf-chart")
@@ -62,6 +63,7 @@ class NetWorthScreen(Screen):
             self.query_one("#nw-chart", Static).update(
                 "[dim]No balance data yet. Run: simledge sync[/]"
             )
+            self.query_one("#nw-data-table", Static).update("")
             summary_panel.border_title = "Current"
             self.query_one("#nw-summary", Static).update("[dim]No data[/]")
             self._refresh_cashflow(conn, account_ids)
@@ -74,6 +76,8 @@ class NetWorthScreen(Screen):
         w = max(40, self.app.size.width - 8)
         chart = render_line_chart(values, month_labels, width=w, height=12, color=GREEN)
         self.query_one("#nw-chart", Static).update(chart)
+        data_tbl = render_data_table(month_labels, values, width=w)
+        self.query_one("#nw-data-table", Static).update(data_tbl)
         chart_panel.border_title = f"Net Worth ({self._lookback}mo)"
 
         # Summary
