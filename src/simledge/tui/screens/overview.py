@@ -9,15 +9,19 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Static
 
 from simledge.analysis import (
+    daily_average_spending,
     income_by_category,
     monthly_summary,
     recent_transactions,
     spending_by_category_grouped,
+    spending_trend,
+    top_merchants,
+    uncategorized_count,
     yoy_comparison,
     ytd_comparison,
 )
 from simledge.budget import budget_vs_actual, total_budget_summary
-from simledge.config import DB_PATH
+from simledge.config import BUDGETS_PATH, DB_PATH
 from simledge.db import get_last_sync, init_db
 from simledge.goals import all_goals_progress
 from simledge.tui.formatting import format_dollar
@@ -38,7 +42,15 @@ class OverviewScreen(Screen):
         yield NavBar("overview")
         with VerticalScroll():
             yield Vertical(Static("", id="summary-content"), id="summary-panel", classes="panel")
+            yield Vertical(
+                Static("", id="spending-trend-content"),
+                id="spending-trend-panel",
+                classes="panel",
+            )
             yield Vertical(Static("", id="category-content"), id="category-panel", classes="panel")
+            yield Vertical(
+                Static("", id="merchants-content"), id="merchants-panel", classes="panel"
+            )
             yield Vertical(
                 Static("", id="budget-overview-content"),
                 id="budget-overview-panel",
@@ -101,9 +113,11 @@ class OverviewScreen(Screen):
         summary = monthly_summary(conn, month, account_ids=account_ids)
         categories = spending_by_category_grouped(conn, month, account_ids=account_ids)
         inc_cats = income_by_category(conn, month, account_ids=account_ids)
-        budget_items = budget_vs_actual(conn, month, account_ids=account_ids)
+        budget_items = budget_vs_actual(conn, month, path=BUDGETS_PATH, account_ids=account_ids)
         budget_summary = (
-            total_budget_summary(conn, month, account_ids=account_ids) if budget_items else None
+            total_budget_summary(conn, month, path=BUDGETS_PATH, account_ids=account_ids)
+            if budget_items
+            else None
         )
         yoy = yoy_comparison(conn, month, account_ids=account_ids)
         ytd = ytd_comparison(conn, account_ids=account_ids)
@@ -112,7 +126,11 @@ class OverviewScreen(Screen):
         wl_items = (
             all_watchlist_spending(conn, month, account_ids=account_ids) if watchlists_exist else []
         )
-        recent = recent_transactions(conn, limit=10, account_ids=account_ids)
+        trend = spending_trend(conn, months=6, account_ids=account_ids)
+        merchants = top_merchants(conn, month, limit=5, account_ids=account_ids)
+        uncat_count = uncategorized_count(conn, month, account_ids=account_ids)
+        daily_avg = daily_average_spending(conn, month, account_ids=account_ids)
+        recent = recent_transactions(conn, limit=20, account_ids=account_ids)
         last_sync = get_last_sync(conn)
         txn_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
         conn.close()
@@ -120,7 +138,7 @@ class OverviewScreen(Screen):
         # Panel titles
         self.query_one("#summary-panel").border_title = month_display
         self.query_one("#category-panel").border_title = "Categories"
-        recent_count = min(len(recent), 10)
+        recent_count = min(len(recent), 20)
         self.query_one("#recent-panel").border_title = f"Recent ({recent_count})"
 
         # Summary
@@ -135,12 +153,16 @@ class OverviewScreen(Screen):
                 f"{c['category']} {format_dollar(c['total'], masked=m)}" for c in inc_cats[:3]
             )
             income_detail = f"\n[dim]  ({top_sources})[/]"
-        self.query_one("#summary-content", Static).update(
+        summary_lines = (
             f"[bold]Spending:[/] [#ef4444]{format_dollar(spending, masked=m)}[/]"
             f"    [bold]Income:[/] [#22c55e]{format_dollar(income, masked=m)}[/]"
             f"    [bold]Net:[/] {net_color}{format_dollar(net, signed=True, masked=m)}[/]"
             + income_detail
+            + f"\n[bold]Daily avg:[/] [dim]{format_dollar(daily_avg, masked=m)}[/]"
         )
+        if uncat_count > 0:
+            summary_lines += f"    [bold][#eab308]{uncat_count} uncategorized[/][/]"
+        self.query_one("#summary-content", Static).update(summary_lines)
 
         # Category bars (hierarchical)
         if categories:
@@ -160,7 +182,7 @@ class OverviewScreen(Screen):
                 filled = int(bar_width * (pct / max_pct)) if max_pct > 0 else 0
                 bar = f"[#2dd4bf]{bar_char * filled}[/][#333]{empty_char * (bar_width - filled)}[/]"
                 lines.append(
-                    f"{cat:<18} [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
+                    f"[#2dd4bf]{cat:<18}[/] [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
                 )
                 for child in c.get("children", []):
                     child_name = child["category"].split(":", 1)[1]
@@ -169,13 +191,50 @@ class OverviewScreen(Screen):
                     child_filled = int(bar_width * (child_pct / max_pct)) if max_pct > 0 else 0
                     child_bar = f"[#1a9985]{bar_char * child_filled}[/][#333]{empty_char * (bar_width - child_filled)}[/]"
                     lines.append(
-                        f"  {child_name:<16} [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]"
+                        f"  [#5eead4]{child_name:<16}[/] [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]"
                     )
             self.query_one("#category-content", Static).update("\n".join(lines))
         else:
             self.query_one("#category-content", Static).update(
                 "[dim]No spending data this month[/]"
             )
+
+        # Spending trend (last 6 months mini bar chart)
+        trend_panel = self.query_one("#spending-trend-panel")
+        if len(trend) >= 2:
+            trend_panel.border_title = "Spending Trend (6mo)"
+            trend_panel.display = True
+            bar_char = "\u2588"
+            max_trend = max(abs(t["total"]) for t in trend) or 1
+            tw = 20
+            tlines = []
+            for t in trend:
+                label = t["month"][2:]  # "24-01" from "2024-01"
+                amt = abs(t["total"])
+                filled = int(tw * amt / max_trend)
+                is_current = t["month"] == month
+                color = "#2dd4bf" if is_current else "#1a9985"
+                bar = f"[{color}]{bar_char * filled}[/]"
+                tlines.append(f"{label}  {bar} {format_dollar(amt, masked=m)}")
+            self.query_one("#spending-trend-content", Static).update("\n".join(tlines))
+        else:
+            trend_panel.display = False
+
+        # Top merchants
+        merchants_panel = self.query_one("#merchants-panel")
+        if merchants:
+            merchants_panel.border_title = "Top Merchants"
+            merchants_panel.display = True
+            mlines = []
+            for mc in merchants:
+                mlines.append(
+                    f"[#2dd4bf]{mc['merchant'][:30]:<30}[/]  "
+                    f"[#ef4444]{format_dollar(abs(mc['total']), masked=m):>10}[/]  "
+                    f"[dim]{mc['count']} txns[/]"
+                )
+            self.query_one("#merchants-content", Static).update("\n".join(mlines))
+        else:
+            merchants_panel.display = False
 
         # Budget overview (only if budgets exist)
         budget_panel = self.query_one("#budget-overview-panel")

@@ -194,6 +194,46 @@ def recent_transactions(conn, limit=20, account_ids=None):
     ]
 
 
+def top_merchants(conn, month, limit=5, account_ids=None):
+    """Return top merchants by spending for a month."""
+    filt, filt_params = _account_filter(account_ids)
+    rows = conn.execute(
+        "SELECT description, COUNT(*) as cnt, SUM(amount) as total"
+        " FROM transactions"
+        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
+        + filt
+        + " GROUP BY description ORDER BY total ASC LIMIT ?",
+        [month, *filt_params, limit],
+    ).fetchall()
+    return [{"merchant": r[0], "count": r[1], "total": r[2]} for r in rows]
+
+
+def uncategorized_count(conn, month, account_ids=None):
+    """Return count of uncategorized transactions for a month."""
+    filt, filt_params = _account_filter(account_ids)
+    row = conn.execute(
+        "SELECT COUNT(*) FROM transactions"
+        " WHERE strftime('%Y-%m', posted) = ? AND category IS NULL"
+        + filt,
+        [month, *filt_params],
+    ).fetchone()
+    return row[0]
+
+
+def daily_average_spending(conn, month, account_ids=None):
+    """Return average daily spending for a month (up to today or month end)."""
+    filt, filt_params = _account_filter(account_ids)
+    rows = conn.execute(
+        "SELECT COUNT(DISTINCT posted) as days, COALESCE(SUM(amount), 0) as total"
+        " FROM transactions"
+        " WHERE strftime('%Y-%m', posted) = ? AND amount < 0"
+        + filt,
+        [month, *filt_params],
+    ).fetchone()
+    days, total = rows[0], rows[1]
+    return abs(total) / days if days > 0 else 0
+
+
 def yoy_comparison(conn, month, account_ids=None):
     """Compare a month with the same month one year prior."""
     y, m = month.split("-")
@@ -226,20 +266,29 @@ def yoy_comparison(conn, month, account_ids=None):
         )
     categories.sort(key=lambda c: abs(c["current"]), reverse=True)
 
-    def _pct(cur, prev):
+    def _spending_pct(cur, prev):
+        """Spending change: both values are negative (or zero).
+        More negative = more spending. Compare absolute values."""
         if prev == 0:
             return None
+        # cur=-2907, prev=-3000 → (2907-3000)/3000 = -3.1% → spending decreased
         return ((abs(cur) - abs(prev)) / abs(prev)) * 100
+
+    def _income_pct(cur, prev):
+        """Income change: both values are positive (or zero)."""
+        if prev == 0:
+            return None
+        return ((cur - prev) / prev) * 100
 
     return {
         "current_month": month,
         "previous_month": previous_month,
         "current_spending": current["total_spending"],
         "previous_spending": previous["total_spending"],
-        "spending_change_pct": _pct(current["total_spending"], previous["total_spending"]),
+        "spending_change_pct": _spending_pct(current["total_spending"], previous["total_spending"]),
         "current_income": current["total_income"],
         "previous_income": previous["total_income"],
-        "income_change_pct": _pct(current["total_income"], previous["total_income"]),
+        "income_change_pct": _income_pct(current["total_income"], previous["total_income"]),
         "categories": categories,
     }
 
@@ -271,20 +320,25 @@ def ytd_comparison(conn, account_ids=None):
     cur_spending, cur_income = _ytd_totals(current_year)
     prev_spending, prev_income = _ytd_totals(previous_year)
 
-    def _pct(cur, prev):
+    def _spending_pct(cur, prev):
         if prev == 0:
             return None
         return ((abs(cur) - abs(prev)) / abs(prev)) * 100
+
+    def _income_pct(cur, prev):
+        if prev == 0:
+            return None
+        return ((cur - prev) / prev) * 100
 
     return {
         "current_year": current_year,
         "months_counted": now.month,
         "current_spending": cur_spending,
         "previous_spending": prev_spending,
-        "spending_change_pct": _pct(cur_spending, prev_spending),
+        "spending_change_pct": _spending_pct(cur_spending, prev_spending),
         "current_income": cur_income,
         "previous_income": prev_income,
-        "income_change_pct": _pct(cur_income, prev_income),
+        "income_change_pct": _income_pct(cur_income, prev_income),
     }
 
 

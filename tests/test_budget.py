@@ -22,64 +22,62 @@ def _seed_db(tmp_path):
 def test_set_budget(tmp_path):
     from simledge.budget import get_budgets, set_budget
 
-    conn = _seed_db(tmp_path)
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Groceries", 400.00)
-    budgets = get_budgets(conn)
+    set_budget(path, "Groceries", 400.00)
+    budgets = get_budgets(path)
     assert len(budgets) == 1
     assert budgets[0]["category"] == "Groceries"
     assert budgets[0]["monthly_limit"] == 400.00
 
     # Upsert same category
-    set_budget(conn, "Groceries", 500.00)
-    budgets = get_budgets(conn)
+    set_budget(path, "Groceries", 500.00)
+    budgets = get_budgets(path)
     assert len(budgets) == 1
     assert budgets[0]["monthly_limit"] == 500.00
-    conn.close()
 
 
 def test_get_budgets(tmp_path):
     from simledge.budget import get_budgets, set_budget
 
-    conn = _seed_db(tmp_path)
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Groceries", 400.00)
-    set_budget(conn, "Dining", 200.00)
-    set_budget(conn, "Gas", 150.00)
+    set_budget(path, "Groceries", 400.00)
+    set_budget(path, "Dining", 200.00)
+    set_budget(path, "Gas", 150.00)
 
-    budgets = get_budgets(conn)
+    budgets = get_budgets(path)
     assert len(budgets) == 3
     categories = [b["category"] for b in budgets]
     assert "Groceries" in categories
     assert "Dining" in categories
     assert "Gas" in categories
-    conn.close()
 
 
 def test_delete_budget(tmp_path):
     from simledge.budget import delete_budget, get_budgets, set_budget
 
-    conn = _seed_db(tmp_path)
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Groceries", 400.00)
-    budgets = get_budgets(conn)
+    set_budget(path, "Groceries", 400.00)
+    budgets = get_budgets(path)
     assert len(budgets) == 1
 
-    delete_budget(conn, budgets[0]["id"])
-    budgets = get_budgets(conn)
+    delete_budget(path, "Groceries")
+    budgets = get_budgets(path)
     assert len(budgets) == 0
-    conn.close()
 
 
 def test_budget_vs_actual(tmp_path):
     from simledge.budget import budget_vs_actual, set_budget
 
     conn = _seed_db(tmp_path)
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Groceries", 400.00)
-    set_budget(conn, "Dining", 200.00)
+    set_budget(path, "Groceries", 400.00)
+    set_budget(path, "Dining", 200.00)
 
-    result = budget_vs_actual(conn, "2026-03")
+    result = budget_vs_actual(conn, "2026-03", path=path)
     groceries = next(r for r in result if r["category"] == "Groceries")
     assert groceries["budget"] == 400.00
     assert groceries["actual"] == 47.32
@@ -97,10 +95,11 @@ def test_budget_vs_actual_no_spending(tmp_path):
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Groceries", 400.00)
+    set_budget(path, "Groceries", 400.00)
 
-    result = budget_vs_actual(conn, "2026-03")
+    result = budget_vs_actual(conn, "2026-03", path=path)
     assert len(result) == 1
     assert result[0]["actual"] == 0
     assert result[0]["pct_used"] == 0
@@ -112,12 +111,13 @@ def test_total_budget_summary(tmp_path):
     from simledge.budget import set_budget, total_budget_summary
 
     conn = _seed_db(tmp_path)
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Groceries", 400.00)
-    set_budget(conn, "Dining", 200.00)
-    set_budget(conn, "Gas", 150.00)
+    set_budget(path, "Groceries", 400.00)
+    set_budget(path, "Dining", 200.00)
+    set_budget(path, "Gas", 150.00)
 
-    summary = total_budget_summary(conn, "2026-03")
+    summary = total_budget_summary(conn, "2026-03", path=path)
     assert summary["total_budgeted"] == 750.00
     expected_actual = 47.32 + 150.00 + 52.10  # groceries + dining + gas
     assert abs(summary["total_actual"] - expected_actual) < 0.01
@@ -132,16 +132,30 @@ def test_budget_vs_actual_with_account_filter(tmp_path):
     from simledge.budget import budget_vs_actual, set_budget
 
     conn = _seed_db(tmp_path)
+    path = str(tmp_path / "budgets.toml")
 
-    set_budget(conn, "Gas", 150.00)
+    set_budget(path, "Gas", 150.00)
 
     # Gas transaction is on acct-2; filtering to acct-1 should show 0 actual
-    result = budget_vs_actual(conn, "2026-03", account_ids={"acct-1"})
+    result = budget_vs_actual(conn, "2026-03", path=path, account_ids={"acct-1"})
     gas = next(r for r in result if r["category"] == "Gas")
     assert gas["actual"] == 0
 
     # Filtering to acct-2 should show the gas charge
-    result = budget_vs_actual(conn, "2026-03", account_ids={"acct-2"})
+    result = budget_vs_actual(conn, "2026-03", path=path, account_ids={"acct-2"})
     gas = next(r for r in result if r["category"] == "Gas")
     assert gas["actual"] == 52.10
     conn.close()
+
+
+def test_init_budgets(tmp_path):
+    from simledge.budget import init_budgets
+
+    path = str(tmp_path / "budgets.toml")
+    assert init_budgets(path) is True
+    assert (tmp_path / "budgets.toml").exists()
+    content = (tmp_path / "budgets.toml").read_text()
+    assert "budgets" in content
+
+    # Does not overwrite
+    assert init_budgets(path) is False

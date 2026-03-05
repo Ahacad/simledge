@@ -11,11 +11,10 @@ from textual.widgets import DataTable, Input, Static
 from simledge.budget import (
     budget_vs_actual,
     delete_budget,
-    get_budgets,
     set_budget,
     total_budget_summary,
 )
-from simledge.config import DB_PATH
+from simledge.config import BUDGETS_PATH, DB_PATH
 from simledge.db import init_db
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
@@ -171,13 +170,9 @@ class BudgetScreen(Screen):
         month_display = datetime.strptime(month, "%Y-%m").strftime("%B %Y")
         account_ids = self.app.active_account_ids
 
-        items = budget_vs_actual(conn, month, account_ids=account_ids)
-        summary = total_budget_summary(conn, month, account_ids=account_ids)
-        budgets = get_budgets(conn)
+        items = budget_vs_actual(conn, month, path=BUDGETS_PATH, account_ids=account_ids)
+        summary = total_budget_summary(conn, month, path=BUDGETS_PATH, account_ids=account_ids)
         conn.close()
-
-        # Build budget id lookup
-        budget_ids = {b["category"].lower(): b["id"] for b in budgets}
 
         # Summary panel
         self.query_one(
@@ -214,7 +209,7 @@ class BudgetScreen(Screen):
                 f"[#ef4444]{format_dollar(item['actual'], masked=m)}[/]",
                 f"[{rem_color}]{format_dollar(remaining, signed=True, masked=m)}[/]",
                 bar,
-                key=str(budget_ids.get(item["category"].lower(), item["category"])),
+                key=item["category"],
             )
 
         budget_count = len(items)
@@ -227,15 +222,12 @@ class BudgetScreen(Screen):
             f"[dim]{budget_count} budgets  |  {status_pace}  |  n: new  d: delete  Enter: edit[/]"
         )
 
-    def _get_selected_budget(self):
+    def _get_selected_category(self):
         table = self.query_one("#budget-table", DataTable)
         if table.row_count == 0:
             return None
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-        try:
-            return int(row_key.value)
-        except (ValueError, TypeError):
-            return None
+        return row_key.value
 
     def action_new_budget(self):
         self.app.push_screen(BudgetModal(), callback=self._on_modal_result)
@@ -243,9 +235,7 @@ class BudgetScreen(Screen):
     def _on_modal_result(self, result):
         if result is None:
             return
-        conn = init_db(DB_PATH)
-        set_budget(conn, result["category"], result["amount"])
-        conn.close()
+        set_budget(BUDGETS_PATH, result["category"], result["amount"])
         self.app.notify(f"Budget set: {result['category']} ${result['amount']:,.2f}")
         self._refresh_data()
 
@@ -254,10 +244,10 @@ class BudgetScreen(Screen):
         if table.row_count == 0:
             self.app.notify("No budget selected", severity="warning")
             return
-        _row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-        # Find the budget data from table row
         conn = init_db(DB_PATH)
-        items = budget_vs_actual(conn, self._month, account_ids=self.app.active_account_ids)
+        items = budget_vs_actual(
+            conn, self._month, path=BUDGETS_PATH, account_ids=self.app.active_account_ids
+        )
         conn.close()
         row_idx = table.cursor_coordinate.row
         if row_idx < len(items):
@@ -268,12 +258,10 @@ class BudgetScreen(Screen):
             )
 
     def action_delete_budget(self):
-        budget_id = self._get_selected_budget()
-        if budget_id is None:
+        category = self._get_selected_category()
+        if category is None:
             self.app.notify("No budget selected", severity="warning")
             return
-        conn = init_db(DB_PATH)
-        delete_budget(conn, budget_id)
-        conn.close()
+        delete_budget(BUDGETS_PATH, category)
         self.app.notify("Budget deleted")
         self._refresh_data()

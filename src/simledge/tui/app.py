@@ -172,8 +172,20 @@ class SimpLedgeApp(App):
         self.privacy_mode = False
 
     def on_mount(self):
+        self._migrate_budgets()
         self.switch_mode("overview")
         self._maybe_auto_sync()
+
+    def _migrate_budgets(self):
+        """One-time migration of budgets from SQLite to TOML."""
+        from simledge.budget import migrate_from_db
+        from simledge.config import BUDGETS_PATH
+
+        conn = init_db(DB_PATH)
+        count = migrate_from_db(conn, BUDGETS_PATH)
+        conn.close()
+        if count:
+            self.notify(f"Migrated {count} budgets to {BUDGETS_PATH}")
 
     def _maybe_auto_sync(self):
         """Auto-sync if last successful sync was > 24h ago."""

@@ -15,3 +15,4 @@ LOG_DIR = DATA_DIR
 LOG_PATH = os.path.join(DATA_DIR, "simledge.log")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.toml")
 RULES_PATH = os.path.join(CONFIG_DIR, "rules.toml")
+BUDGETS_PATH = os.path.join(CONFIG_DIR, "budgets.toml")

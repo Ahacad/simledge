@@ -134,7 +134,13 @@ class RulesScreen(Screen):
 
         table = self.query_one("#rules-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("#", "Pattern", "Category", "Priority")
+
+        max_pat = max((len(r["pattern"]) for r in self._rules), default=7)
+        max_cat = max((len(r["category"]) for r in self._rules), default=8)
+        table.add_column("#", width=4)
+        table.add_column("Pattern", width=min(max(max_pat, 7), 60))
+        table.add_column("Category", width=min(max(max_cat, 8), 25))
+        table.add_column("Priority", width=8)
 
         for i, r in enumerate(self._rules):
             table.add_row(
