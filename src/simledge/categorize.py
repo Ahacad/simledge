@@ -257,11 +257,12 @@ def apply_rules(rules, conn, dry_run=False):
 CC_PAYMENT_PATTERNS = re.compile(
     r"AUTOPAY|AUTO\s*PAY|PAYMENT\s*-?\s*THANK\s*YOU|ONLINE\s+PAYMENT"
     r"|MOBILE\s+PAYMENT|AUTOMATIC\s+PAYMENT|PAYMENT\s+RECEIVED"
-    r"|BILL\s+PAY|ACH\s+PAYMENT|CARD\s+PAYMENT",
+    r"|BILL\s+PAY|ACH\s+PAYMENT|CARD\s+PAYMENT|PAYMENT\s+TO\s+.*CARD",
     re.IGNORECASE,
 )
 
 CC_ACCOUNT_TYPES = {"credit", "credit_card"}
+_KNOWN_NON_CC_TYPES = {"checking", "savings"}
 
 
 def detect_cc_payments(conn, verbose=False):
@@ -310,7 +311,14 @@ def detect_cc_payments(conn, verbose=False):
                 pairs_found += 1
                 neg_is_cc = neg["type"] in CC_ACCOUNT_TYPES
                 pos_is_cc = pos["type"] in CC_ACCOUNT_TYPES
-                if not (neg_is_cc ^ pos_is_cc):
+
+                if neg_is_cc ^ pos_is_cc:
+                    pass  # clear signal: one CC, one non-CC
+                elif (neg["type"] in _KNOWN_NON_CC_TYPES and pos["type"] is None
+                      and (CC_PAYMENT_PATTERNS.search(neg["description"])
+                           or CC_PAYMENT_PATTERNS.search(pos["description"]))):
+                    pass  # known non-CC + unknown type, description confirms CC payment
+                else:
                     rejected_no_cc += 1
                     continue
 

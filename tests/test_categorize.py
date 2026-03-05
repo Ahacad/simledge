@@ -249,6 +249,51 @@ def test_detect_cc_payments_skips_already_categorized(tmp_path):
     conn.close()
 
 
+def test_detect_cc_payments_null_type_with_payment_description(tmp_path):
+    """When CC account has NULL type, fall back to description matching."""
+    from simledge.categorize import detect_cc_payments
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cfu", "org-1", "Chase Freedom Unlimited", "USD", None)
+
+    upsert_transaction(
+        conn, "txn-out", "acct-chk", "2026-03-01", -2000.00,
+        "PAYMENT TO CHASE CARD ENDING IN 2348",
+    )
+    upsert_transaction(
+        conn, "txn-in", "acct-cfu", "2026-03-01", 2000.00, "PAYMENT-THANK YOU",
+    )
+
+    count = detect_cc_payments(conn)
+    assert count == 2
+    cat_out = conn.execute("SELECT category FROM transactions WHERE id='txn-out'").fetchone()[0]
+    cat_in = conn.execute("SELECT category FROM transactions WHERE id='txn-in'").fetchone()[0]
+    assert cat_out == "Transfer:Credit Card Payment"
+    assert cat_in == "Transfer:Credit Card Payment"
+    conn.close()
+
+
+def test_detect_cc_payments_null_type_without_payment_description(tmp_path):
+    """NULL-type account pair without payment description should NOT match."""
+    from simledge.categorize import detect_cc_payments
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-unk", "org-1", "Some Account", "USD", None)
+
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -500.00, "TRANSFER OUT")
+    upsert_transaction(conn, "txn-in", "acct-unk", "2026-03-01", 500.00, "DEPOSIT")
+
+    count = detect_cc_payments(conn)
+    assert count == 0
+    conn.close()
+
+
 def test_detect_cc_payments_no_match_without_cc_account(tmp_path):
     """Same-day/same-amount pair between two non-CC accounts should NOT match."""
     from simledge.categorize import detect_cc_payments
