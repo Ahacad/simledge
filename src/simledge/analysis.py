@@ -4,7 +4,11 @@ from datetime import datetime, timedelta
 
 _EXCLUDE_CC = " AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
 _EXCLUDE_TRANSFERS = " AND (category IS NULL OR category NOT LIKE 'Transfer%')"
-_EXCLUDE_TRANSFERS_T = " AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
+# For income: only exclude self-to-self transfers, not external ones (e.g. Zelle from friends)
+_EXCLUDE_SELF_TRANSFERS = (
+    " AND (t.category IS NULL"
+    " OR t.category NOT IN ('Transfer:Internal', 'Transfer:Credit Card Payment'))"
+)
 
 
 def _account_filter(account_ids, table_prefix="", column=None):
@@ -42,7 +46,8 @@ def monthly_summary(conn, month, account_ids=None):
         "   THEN t.amount END), 0),"
         " COALESCE(SUM(CASE WHEN t.amount > 0"
         "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
-        "   AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
+        "   AND (t.category IS NULL"
+        "     OR t.category NOT IN ('Transfer:Internal', 'Transfer:Credit Card Payment'))"
         "   THEN t.amount END), 0)"
         " FROM transactions t"
         " JOIN accounts a ON t.account_id = a.id"
@@ -138,7 +143,7 @@ def income_by_category(conn, month, account_ids=None):
         " JOIN accounts a ON t.account_id = a.id"
         " WHERE strftime('%Y-%m', t.posted) = ? AND t.amount > 0"
         + _EXCLUDE_CC
-        + _EXCLUDE_TRANSFERS_T
+        + _EXCLUDE_SELF_TRANSFERS
         + filt
         + " GROUP BY cat ORDER BY total DESC",
         [month, *filt_params],
@@ -159,7 +164,7 @@ def income_trend(conn, months=6, account_ids=None):
         " JOIN accounts a ON t.account_id = a.id"
         " WHERE t.amount > 0 AND t.posted >= ?"
         + _EXCLUDE_CC
-        + _EXCLUDE_TRANSFERS_T
+        + _EXCLUDE_SELF_TRANSFERS
         + filt
         + " GROUP BY month ORDER BY month",
         [start_str, *filt_params],
@@ -320,7 +325,8 @@ def ytd_comparison(conn, account_ids=None):
             "   THEN t.amount END), 0),"
             " COALESCE(SUM(CASE WHEN t.amount > 0"
             "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
-            "   AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
+            "   AND (t.category IS NULL"
+            "     OR t.category NOT IN ('Transfer:Internal', 'Transfer:Credit Card Payment'))"
             "   THEN t.amount END), 0)"
             " FROM transactions t"
             " JOIN accounts a ON t.account_id = a.id"

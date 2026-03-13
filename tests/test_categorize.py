@@ -478,3 +478,169 @@ def test_force_apply_preserves_manual(tmp_path):
     auto_cat = conn.execute("SELECT category FROM transactions WHERE id='txn-auto'").fetchone()[0]
     assert auto_cat == "Groceries"
     conn.close()
+
+
+# --- Internal transfer detection tests ---
+
+
+def test_detect_internal_transfers_tags_pair(tmp_path):
+    """Checking→savings transfer pair should be tagged Transfer:Internal."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -1000.00, "TRANSFER TO SAVINGS")
+    upsert_transaction(conn, "txn-in", "acct-sav", "2026-03-01", 1000.00, "TRANSFER FROM CHECKING")
+
+    count = detect_internal_transfers(conn)
+    assert count == 2
+    cat_out = conn.execute("SELECT category FROM transactions WHERE id='txn-out'").fetchone()[0]
+    cat_in = conn.execute("SELECT category FROM transactions WHERE id='txn-in'").fetchone()[0]
+    assert cat_out == "Transfer:Internal"
+    assert cat_in == "Transfer:Internal"
+    conn.close()
+
+
+def test_detect_internal_transfers_upgrades_generic_transfer(tmp_path):
+    """Transactions already categorized as 'Transfer' should be upgraded to 'Transfer:Internal'."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
+    upsert_transaction(
+        conn, "txn-out", "acct-chk", "2026-03-01", -500.00, "ONLINE XFER", category="Transfer"
+    )
+    upsert_transaction(
+        conn, "txn-in", "acct-sav", "2026-03-01", 500.00, "ONLINE XFER", category="Transfer"
+    )
+
+    count = detect_internal_transfers(conn)
+    assert count == 2
+    cat = conn.execute("SELECT category FROM transactions WHERE id='txn-in'").fetchone()[0]
+    assert cat == "Transfer:Internal"
+    conn.close()
+
+
+def test_detect_internal_transfers_skips_cc_accounts(tmp_path):
+    """CC account pairs should be left for detect_cc_payments."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-cc", "org-1", "Credit Card", "USD", "credit")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -500.00, "TRANSFER AUTOPAY")
+    upsert_transaction(conn, "txn-in", "acct-cc", "2026-03-01", 500.00, "PAYMENT THANK YOU")
+
+    count = detect_internal_transfers(conn)
+    assert count == 0
+    conn.close()
+
+
+def test_detect_internal_transfers_requires_transfer_keyword(tmp_path):
+    """Same-amount pair without transfer keywords should NOT match."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
+    # Coincidental same-amount: grocery purchase and a deposit
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -50.00, "WHOLE FOODS")
+    upsert_transaction(conn, "txn-in", "acct-sav", "2026-03-01", 50.00, "DEPOSIT")
+
+    count = detect_internal_transfers(conn)
+    assert count == 0
+    conn.close()
+
+
+def test_detect_internal_transfers_same_account_no_match(tmp_path):
+    """Opposite-sign transactions on the SAME account should not match."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -200.00, "TRANSFER OUT")
+    upsert_transaction(conn, "txn-in", "acct-chk", "2026-03-01", 200.00, "TRANSFER IN")
+
+    count = detect_internal_transfers(conn)
+    assert count == 0
+    conn.close()
+
+
+def test_detect_internal_transfers_respects_manual(tmp_path):
+    """Manual categories should not be overridden."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import (
+        init_db,
+        update_transaction_field,
+        upsert_account,
+        upsert_institution,
+        upsert_transaction,
+    )
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -300.00, "TRANSFER OUT")
+    upsert_transaction(conn, "txn-in", "acct-sav", "2026-03-01", 300.00, "TRANSFER IN")
+    # Manually categorize one side
+    update_transaction_field(conn, "txn-out", "category", "My Transfer")
+
+    count = detect_internal_transfers(conn)
+    # Only the uncategorized side should be tagged
+    assert count == 1
+    cat_out = conn.execute("SELECT category FROM transactions WHERE id='txn-out'").fetchone()[0]
+    assert cat_out == "My Transfer"
+    cat_in = conn.execute("SELECT category FROM transactions WHERE id='txn-in'").fetchone()[0]
+    assert cat_in == "Transfer:Internal"
+    conn.close()
+
+
+def test_detect_internal_transfers_sets_category_source(tmp_path):
+    """detect_internal_transfers should set category_source='internal_detect'."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -750.00, "ONLINE TRANSFER")
+    upsert_transaction(conn, "txn-in", "acct-sav", "2026-03-01", 750.00, "ONLINE TRANSFER")
+
+    detect_internal_transfers(conn)
+    for tid in ("txn-out", "txn-in"):
+        source = conn.execute(
+            "SELECT category_source FROM transactions WHERE id=?", (tid,)
+        ).fetchone()[0]
+        assert source == "internal_detect"
+    conn.close()
+
+
+def test_detect_internal_transfers_outside_window_no_match(tmp_path):
+    """Pairs posted more than 5 days apart should NOT match."""
+    from simledge.categorize import detect_internal_transfers
+    from simledge.db import init_db, upsert_account, upsert_institution, upsert_transaction
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Bank", None)
+    upsert_account(conn, "acct-chk", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-sav", "org-1", "Savings", "USD", "savings")
+    upsert_transaction(conn, "txn-out", "acct-chk", "2026-03-01", -500.00, "TRANSFER OUT")
+    upsert_transaction(conn, "txn-in", "acct-sav", "2026-03-07", 500.00, "TRANSFER IN")
+
+    count = detect_internal_transfers(conn)
+    assert count == 0
+    conn.close()

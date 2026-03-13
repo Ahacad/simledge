@@ -212,7 +212,7 @@ def _run_rule(args):
         conn.close()
         print(f"Would categorize {count} transactions.")
     elif args.rule_command == "apply":
-        from simledge.categorize import detect_cc_payments
+        from simledge.categorize import detect_cc_payments, detect_internal_transfers
         from simledge.db import init_db
 
         rules = load_rules(RULES_PATH)
@@ -230,8 +230,12 @@ def _run_rule(args):
             print("Reset auto-categorized (kept manual).")
         count = apply_rules(rules, conn)
         cc_count = detect_cc_payments(conn, verbose=args.verbose)
+        int_count = detect_internal_transfers(conn, verbose=args.verbose)
         conn.close()
-        print(f"Categorized {count} transactions, detected {cc_count} CC payment transfers.")
+        print(
+            f"Categorized {count} transactions, detected {cc_count} CC payments,"
+            f" {int_count} internal transfers."
+        )
     else:
         print("Usage: simledge rule {init,add,list,test,apply}")
 

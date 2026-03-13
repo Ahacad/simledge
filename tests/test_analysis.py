@@ -521,6 +521,69 @@ def test_spending_excludes_cc_payment_transfers(tmp_path):
     conn.close()
 
 
+def test_income_excludes_internal_transfers(tmp_path):
+    """Internal transfers (self→self) should NOT count as income."""
+    from simledge.analysis import income_by_category, income_trend, monthly_summary
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+    upsert_account(conn, "acct-2", "org-1", "Savings", "USD", "savings")
+
+    # Real income
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", 4225.00, "PAYROLL", category="Income:Salary"
+    )
+    # Internal transfer — should NOT be income
+    upsert_transaction(
+        conn,
+        "t2",
+        "acct-2",
+        "2026-03-05",
+        1000.00,
+        "TRANSFER FROM CHECKING",
+        category="Transfer:Internal",
+    )
+
+    summary = monthly_summary(conn, "2026-03")
+    assert summary["total_income"] == 4225.00
+
+    inc = income_by_category(conn, "2026-03")
+    total_inc = sum(c["total"] for c in inc)
+    assert total_inc == 4225.00
+
+    trend = income_trend(conn, months=1)
+    mar = [r for r in trend if r["month"] == "2026-03"]
+    assert mar[0]["total"] == 4225.00
+    conn.close()
+
+
+def test_income_includes_external_transfers(tmp_path):
+    """External transfers (Zelle/Venmo from friends) SHOULD count as income."""
+    from simledge.analysis import income_by_category, monthly_summary
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+
+    # Zelle from a friend — categorized as generic Transfer, not Internal
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", 50.00, "ZELLE FROM FRIEND", category="Transfer"
+    )
+    # Real payroll
+    upsert_transaction(
+        conn, "t2", "acct-1", "2026-03-01", 4225.00, "PAYROLL", category="Income:Salary"
+    )
+
+    summary = monthly_summary(conn, "2026-03")
+    assert summary["total_income"] == 4275.00  # payroll + zelle
+
+    inc = income_by_category(conn, "2026-03")
+    total_inc = sum(c["total"] for c in inc)
+    assert total_inc == 4275.00
+    conn.close()
+
+
 def test_ytd_excludes_transfers(tmp_path):
     from datetime import datetime as dt
     from unittest.mock import patch
