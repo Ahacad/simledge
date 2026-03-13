@@ -4,7 +4,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Middle, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Input, Static
+from textual.widgets import Input, Select, Static
 
 from simledge.analysis import account_summary
 from simledge.config import DB_PATH
@@ -25,9 +25,12 @@ class GoalModal(ModalScreen):
         Binding("escape", "cancel", "Cancel", priority=True),
     ]
 
-    def __init__(self, goal=None):
+    _NONE = "__none__"
+
+    def __init__(self, goal=None, accounts=None):
         super().__init__()
         self._goal = goal
+        self._accounts = accounts or []
 
     def compose(self) -> ComposeResult:
         title = "Edit Goal" if self._goal else "New Goal"
@@ -48,14 +51,25 @@ class GoalModal(ModalScreen):
                 value=self._goal["target_date"] or "" if self._goal else "",
                 id="goal-date",
             )
-            yield Input(
-                placeholder="Account name (optional, for auto-tracking)",
-                value="",
+            acct_options = [
+                (f"{a['display_name'] or a['name']} ({a['institution']})", a["id"])
+                for a in self._accounts
+            ]
+            acct_options.insert(0, ("(None — no linked account)", self._NONE))
+            init_acct = (
+                self._goal["account_id"]
+                if self._goal and self._goal.get("account_id")
+                else self._NONE
+            )
+            yield Select(
+                acct_options,
+                value=init_acct,
+                prompt="Link account (optional)...",
                 id="goal-account",
             )
             yield Static(
                 "[dim]Name: required  |  Target: positive number  |  Date: YYYY-MM-DD\n"
-                "Enter: save  Esc: cancel[/]",
+                "Account: select to auto-track balance  |  Enter: save  Esc: cancel[/]",
                 id="goal-modal-hint",
             )
 
@@ -66,7 +80,8 @@ class GoalModal(ModalScreen):
         name = self.query_one("#goal-name", Input).value.strip()
         target_str = self.query_one("#goal-target", Input).value.strip()
         date_str = self.query_one("#goal-date", Input).value.strip()
-        account_str = self.query_one("#goal-account", Input).value.strip()
+        acct_select = self.query_one("#goal-account", Select)
+        account_id = acct_select.value if acct_select.value != self._NONE else None
 
         if not name:
             self.app.notify("Name is required", severity="error")
@@ -90,7 +105,7 @@ class GoalModal(ModalScreen):
 
         result = {"name": name, "target_amount": target}
         result["target_date"] = date_str if date_str else None
-        result["account_name"] = account_str if account_str else None
+        result["account_id"] = account_id
 
         if self._goal:
             result["id"] = self._goal["id"]
@@ -185,17 +200,16 @@ class GoalsScreen(Screen):
             f"[dim]{len(progress)} goals  |  n: new  d: delete  Enter: edit[/]"
         )
 
-    def _resolve_account_id(self, conn, account_name):
-        if not account_name:
-            return None
+    def _get_accounts(self):
+        conn = init_db(DB_PATH)
         accounts = account_summary(conn)
-        for a in accounts:
-            if a["name"].lower() == account_name.lower():
-                return a["id"]
-        return None
+        conn.close()
+        return accounts
 
     def action_new_goal(self):
-        self.app.push_screen(GoalModal(), callback=self._on_modal_result)
+        self.app.push_screen(
+            GoalModal(accounts=self._get_accounts()), callback=self._on_modal_result
+        )
 
     def _on_modal_result(self, result):
         if result is None:
@@ -211,7 +225,7 @@ class GoalsScreen(Screen):
             )
             self.app.notify(f"Goal updated: {result['name']}")
         else:
-            account_id = self._resolve_account_id(conn, result.get("account_name"))
+            account_id = result.get("account_id")
             create_goal(
                 conn,
                 result["name"],
@@ -245,7 +259,9 @@ class GoalsScreen(Screen):
             return
         idx = min(self._selected_idx, len(goals) - 1)
         goal = goals[idx]
-        self.app.push_screen(GoalModal(goal=goal), callback=self._on_modal_result)
+        self.app.push_screen(
+            GoalModal(goal=goal, accounts=self._get_accounts()), callback=self._on_modal_result
+        )
 
     def action_delete_goal(self):
         conn = init_db(DB_PATH)
