@@ -24,13 +24,23 @@ _CUSTOM = "__custom__"
 
 
 def _get_all_categories(conn):
-    """Get sorted list of all known categories from DB + rules."""
+    """Get sorted list of all known categories from DB + rules.
+
+    Includes parent categories extracted from subcategories (e.g. "Housing"
+    from "Housing:Rent") so users can budget at any level.
+    """
     db_cats = conn.execute(
         "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL"
     ).fetchall()
     all_cats = {r[0] for r in db_cats}
     for rule in load_rules(RULES_PATH):
         all_cats.add(rule["category"])
+
+    # Extract parent categories from subcategories
+    for cat in list(all_cats):
+        if ":" in cat:
+            all_cats.add(cat.split(":")[0])
+
     return sorted(all_cats)
 
 

@@ -148,6 +148,41 @@ def test_budget_vs_actual_with_account_filter(tmp_path):
     conn.close()
 
 
+def test_budget_vs_actual_parent_aggregates_children(tmp_path):
+    from simledge.budget import budget_vs_actual, set_budget
+
+    conn = init_db(str(tmp_path / "test.db"))
+    upsert_institution(conn, "org-1", "Chase", "chase.com")
+    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
+
+    upsert_transaction(
+        conn, "t1", "acct-1", "2026-03-01", -1200.00, "RENT", category="Housing:Rent"
+    )
+    upsert_transaction(
+        conn, "t2", "acct-1", "2026-03-02", -80.00, "COMCAST", category="Housing:Internet"
+    )
+    upsert_transaction(
+        conn, "t3", "acct-1", "2026-03-03", -45.00, "VISIBLE", category="Housing:Phone"
+    )
+
+    path = str(tmp_path / "budgets.toml")
+
+    # Budget at parent level should aggregate all Housing:* subcategories
+    set_budget(path, "Housing", 1500.00)
+
+    result = budget_vs_actual(conn, "2026-03", path=path)
+    housing = next(r for r in result if r["category"] == "Housing")
+    assert housing["actual"] == 1325.00  # 1200 + 80 + 45
+    assert housing["remaining"] == 175.00
+
+    # Budget at subcategory level should only match that subcategory
+    set_budget(path, "Housing:Rent", 1300.00)
+    result = budget_vs_actual(conn, "2026-03", path=path)
+    rent = next(r for r in result if r["category"] == "Housing:Rent")
+    assert rent["actual"] == 1200.00
+    conn.close()
+
+
 def test_init_budgets(tmp_path):
     from simledge.budget import init_budgets
 

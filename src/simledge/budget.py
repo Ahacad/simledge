@@ -129,13 +129,17 @@ def budget_vs_actual(conn, month, path=None, account_ids=None):
     filt, filt_params = _account_filter(account_ids)
     result = []
     for b in budgets:
+        # Parent categories (e.g. "Housing") aggregate all subcategories
+        # (e.g. "Housing:Rent", "Housing:Internet").
+        # Leaf categories match exactly.
         row = conn.execute(
             "SELECT COALESCE(SUM(ABS(amount)), 0)"
             " FROM transactions"
-            " WHERE LOWER(category) = LOWER(?)"
+            " WHERE (LOWER(category) = LOWER(?)"
+            "        OR LOWER(category) LIKE LOWER(? || ':%'))"
             " AND strftime('%Y-%m', posted) = ?"
             " AND amount < 0" + filt,
-            [b["category"], month, *filt_params],
+            [b["category"], b["category"], month, *filt_params],
         ).fetchone()
         actual = row[0]
         budget = b["monthly_limit"]
