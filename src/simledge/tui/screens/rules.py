@@ -240,7 +240,7 @@ class RulesScreen(Screen):
     def _on_force_apply_confirm(self, confirmed):
         if not confirmed:
             return
-        from simledge.categorize import detect_cc_payments, detect_internal_transfers
+        from simledge.categorize import detect_cc_payments
 
         rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
@@ -251,10 +251,9 @@ class RulesScreen(Screen):
         conn.commit()
         count = apply_rules(rules, conn)
         cc_count = detect_cc_payments(conn)
-        int_count = detect_internal_transfers(conn)
         conn.close()
         self.app.notify(
-            f"Re-categorized {count}, {cc_count} CC, {int_count} internal transfers (kept manual)"
+            f"Re-categorized {count} transactions, {cc_count} CC transfers (kept manual)"
         )
 
     def action_force_all_apply_rules(self):
@@ -270,7 +269,7 @@ class RulesScreen(Screen):
     def _on_force_all_apply_confirm(self, confirmed):
         if not confirmed:
             return
-        from simledge.categorize import detect_cc_payments, detect_internal_transfers
+        from simledge.categorize import detect_cc_payments
 
         rules = load_rules(RULES_PATH)
         conn = init_db(DB_PATH)
@@ -278,11 +277,8 @@ class RulesScreen(Screen):
         conn.commit()
         count = apply_rules(rules, conn)
         cc_count = detect_cc_payments(conn)
-        int_count = detect_internal_transfers(conn)
         conn.close()
-        self.app.notify(
-            f"Reset ALL & re-categorized {count}, {cc_count} CC, {int_count} internal transfers"
-        )
+        self.app.notify(f"Reset ALL & re-categorized {count} transactions, {cc_count} CC transfers")
 
     def action_init_rules(self):
         created = init_rules(RULES_PATH)

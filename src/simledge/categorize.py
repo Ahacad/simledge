@@ -130,7 +130,7 @@ DEFAULT_RULES = [
         "category": "Finance:Fees",
         "priority": 0,
     },
-    {"pattern": "INTEREST PAID|INTEREST EARN|APY", "category": "Finance:Interest", "priority": 0},
+    {"pattern": "INTEREST PAID|INTEREST EARN|APY", "category": "Income:Interest", "priority": 0},
     # Income
     {
         "pattern": "PAYROLL|DIRECT DEP|DIR DEP|ACH.*SALARY|EMPLOYER",
@@ -388,109 +388,4 @@ def detect_cc_payments(conn, verbose=False):
 
     conn.commit()
     log.info("detected %d credit card payment transactions", count)
-    return count
-
-
-INTERNAL_TRANSFER_PATTERNS = re.compile(
-    r"TRANSFER|XFER|FUNDS\s+TRANSFER|WIRE\s+TRANSFER"
-    r"|ONLINE\s+TRANSFER|ACH\s+TRANSFER|INTERNAL\s+TRANSFER",
-    re.IGNORECASE,
-)
-
-INTERNAL_TRANSFER_DATE_WINDOW = 5
-
-
-def detect_internal_transfers(conn, verbose=False):
-    """Detect transfers between the user's own non-CC accounts.
-
-    Matching strategy (all conditions must hold for a pair):
-      1. Same absolute amount (rounded to cents).
-      2. Posted dates within INTERNAL_TRANSFER_DATE_WINDOW days.
-      3. Opposite signs (one negative outflow, one positive inflow).
-      4. Different accounts (both in our DB = both owned by user).
-      5. Neither account is a credit card (CC pairs handled separately).
-      6. At least one side matches transfer keywords or is already
-         categorized as Transfer.
-
-    This distinguishes self-to-self transfers (not income) from external
-    transfers like Zelle/Venmo from friends (which are income).
-
-    Matched transactions are tagged "Transfer:Internal". Manual
-    categories are preserved.
-    """
-    rows = conn.execute(
-        "SELECT t.id, t.posted, t.amount, t.description, t.account_id,"
-        " a.type, t.category, t.category_source"
-        " FROM transactions t"
-        " JOIN accounts a ON t.account_id = a.id"
-    ).fetchall()
-
-    from collections import defaultdict
-
-    by_amount = defaultdict(list)
-    for tid, posted, amount, desc, acct_id, acct_type, category, cat_source in rows:
-        by_amount[round(abs(amount), 2)].append(
-            {
-                "id": tid,
-                "posted": date.fromisoformat(posted) if isinstance(posted, str) else posted,
-                "amount": amount,
-                "description": desc,
-                "account_id": acct_id,
-                "type": acct_type,
-                "category": category,
-                "category_source": cat_source,
-            }
-        )
-
-    count = 0
-    tagged = set()
-    window = timedelta(days=INTERNAL_TRANSFER_DATE_WINDOW)
-
-    for abs_amt, txns in by_amount.items():
-        if len(txns) < 2 or abs_amt == 0:
-            continue
-
-        negatives = [t for t in txns if t["amount"] < 0]
-        positives = [t for t in txns if t["amount"] > 0]
-
-        for neg in negatives:
-            for pos in positives:
-                if abs(neg["posted"] - pos["posted"]) > window:
-                    continue
-
-                if neg["account_id"] == pos["account_id"]:
-                    continue
-
-                # Skip CC accounts — handled by detect_cc_payments
-                if neg["type"] in CC_ACCOUNT_TYPES or pos["type"] in CC_ACCOUNT_TYPES:
-                    continue
-
-                # At least one side must look like a transfer
-                neg_is_transfer = (
-                    neg["category"] is not None and neg["category"].startswith("Transfer")
-                ) or INTERNAL_TRANSFER_PATTERNS.search(neg["description"])
-                pos_is_transfer = (
-                    pos["category"] is not None and pos["category"].startswith("Transfer")
-                ) or INTERNAL_TRANSFER_PATTERNS.search(pos["description"])
-                if not (neg_is_transfer or pos_is_transfer):
-                    continue
-
-                for t in (neg, pos):
-                    if t["id"] in tagged:
-                        continue
-                    if t["category_source"] == "manual":
-                        continue
-                    if t["category"] is None or t["category"] == "Transfer":
-                        conn.execute(
-                            "UPDATE transactions SET category = ?,"
-                            " category_source = 'internal_detect' WHERE id = ?",
-                            ("Transfer:Internal", t["id"]),
-                        )
-                        tagged.add(t["id"])
-                        count += 1
-
-    conn.commit()
-    if verbose:
-        print(f"  Detected {count} internal transfer transactions")
-    log.info("detected %d internal transfer transactions", count)
     return count

@@ -2,13 +2,7 @@
 
 from datetime import datetime, timedelta
 
-_EXCLUDE_CC = " AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
 _EXCLUDE_TRANSFERS = " AND (category IS NULL OR category NOT LIKE 'Transfer%')"
-# For income: only exclude self-to-self transfers, not external ones (e.g. Zelle from friends)
-_EXCLUDE_SELF_TRANSFERS = (
-    " AND (t.category IS NULL"
-    " OR t.category NOT IN ('Transfer:Internal', 'Transfer:Credit Card Payment'))"
-)
 
 
 def _account_filter(account_ids, table_prefix="", column=None):
@@ -37,20 +31,20 @@ def spending_by_category(conn, month, account_ids=None):
 
 
 def monthly_summary(conn, month, account_ids=None):
-    """Return total spending, income, and net for a month."""
+    """Return total spending, income, and net for a month.
+
+    Income is whitelist-based: only transactions categorized as Income:*
+    count. This avoids heuristic issues with transfers between accounts.
+    """
     filt, filt_params = _account_filter(account_ids, table_prefix="t.")
     row = conn.execute(
         "SELECT"
         " COALESCE(SUM(CASE WHEN t.amount < 0"
         "   AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
         "   THEN t.amount END), 0),"
-        " COALESCE(SUM(CASE WHEN t.amount > 0"
-        "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
-        "   AND (t.category IS NULL"
-        "     OR t.category NOT IN ('Transfer:Internal', 'Transfer:Credit Card Payment'))"
+        " COALESCE(SUM(CASE WHEN t.category LIKE 'Income%'"
         "   THEN t.amount END), 0)"
         " FROM transactions t"
-        " JOIN accounts a ON t.account_id = a.id"
         " WHERE strftime('%Y-%m', t.posted) = ?" + filt,
         [month, *filt_params],
     ).fetchone()
@@ -138,12 +132,9 @@ def income_by_category(conn, month, account_ids=None):
     """Return income grouped by category for a YYYY-MM month."""
     filt, filt_params = _account_filter(account_ids, table_prefix="t.")
     rows = conn.execute(
-        "SELECT COALESCE(t.category, 'uncategorized') as cat, SUM(t.amount) as total"
+        "SELECT t.category as cat, SUM(t.amount) as total"
         " FROM transactions t"
-        " JOIN accounts a ON t.account_id = a.id"
-        " WHERE strftime('%Y-%m', t.posted) = ? AND t.amount > 0"
-        + _EXCLUDE_CC
-        + _EXCLUDE_SELF_TRANSFERS
+        " WHERE strftime('%Y-%m', t.posted) = ? AND t.category LIKE 'Income%'"
         + filt
         + " GROUP BY cat ORDER BY total DESC",
         [month, *filt_params],
@@ -161,10 +152,7 @@ def income_trend(conn, months=6, account_ids=None):
     rows = conn.execute(
         "SELECT strftime('%Y-%m', t.posted) as month, SUM(t.amount) as total"
         " FROM transactions t"
-        " JOIN accounts a ON t.account_id = a.id"
-        " WHERE t.amount > 0 AND t.posted >= ?"
-        + _EXCLUDE_CC
-        + _EXCLUDE_SELF_TRANSFERS
+        " WHERE t.category LIKE 'Income%' AND t.posted >= ?"
         + filt
         + " GROUP BY month ORDER BY month",
         [start_str, *filt_params],
@@ -323,13 +311,9 @@ def ytd_comparison(conn, account_ids=None):
             " COALESCE(SUM(CASE WHEN t.amount < 0"
             "   AND (t.category IS NULL OR t.category NOT LIKE 'Transfer%')"
             "   THEN t.amount END), 0),"
-            " COALESCE(SUM(CASE WHEN t.amount > 0"
-            "   AND (a.type IS NULL OR a.type NOT IN ('credit', 'credit_card'))"
-            "   AND (t.category IS NULL"
-            "     OR t.category NOT IN ('Transfer:Internal', 'Transfer:Credit Card Payment'))"
+            " COALESCE(SUM(CASE WHEN t.category LIKE 'Income%'"
             "   THEN t.amount END), 0)"
             " FROM transactions t"
-            " JOIN accounts a ON t.account_id = a.id"
             " WHERE strftime('%Y', t.posted) = ?"
             " AND strftime('%m', t.posted) <= ?" + filt,
             [year, current_month_num, *filt_params],

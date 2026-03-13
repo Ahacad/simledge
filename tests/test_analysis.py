@@ -209,39 +209,44 @@ def test_spending_by_category_grouped_empty(tmp_path):
 # --- Income Report tests ---
 
 
-def test_income_excludes_credit_card(tmp_path):
-    """Credit card positive transactions should not count as income."""
+def test_income_only_counts_income_categories(tmp_path):
+    """Only transactions categorized as Income:* count as income."""
     from simledge.analysis import income_by_category, income_trend, monthly_summary
 
     conn = _seed_db(tmp_path)
-    # Add a CC payment (positive on CC account = balance reduction, NOT income)
+    # CC payment (positive, not Income:*) — should NOT be income
     upsert_transaction(conn, "t-cc-pay", "acct-2", "2026-03-05", 500.00, "PAYMENT THANK YOU")
+    # Transfer (positive, not Income:*) — should NOT be income
+    upsert_transaction(
+        conn, "t-xfer", "acct-1", "2026-03-05", 200.00, "TRANSFER", category="Transfer"
+    )
+    # Uncategorized positive — should NOT be income
+    upsert_transaction(conn, "t-unk", "acct-1", "2026-03-05", 100.00, "MYSTERY DEPOSIT")
 
-    # income_by_category should NOT include the CC payment
+    # Only the PAYROLL (category="income") should count
     inc = income_by_category(conn, "2026-03")
     total_inc = sum(c["total"] for c in inc)
-    assert total_inc == 4225.00  # only PAYROLL, not the 500 CC payment
+    assert total_inc == 4225.00
 
-    # monthly_summary income should exclude CC
     summary = monthly_summary(conn, "2026-03")
     assert summary["total_income"] == 4225.00
 
-    # income_trend should exclude CC
     trend = income_trend(conn, months=2)
     mar = [r for r in trend if r["month"] == "2026-03"]
     assert mar[0]["total"] == 4225.00
     conn.close()
 
 
-def test_income_includes_null_type_accounts(tmp_path):
-    """Accounts with no type set should still count toward income."""
+def test_income_works_across_account_types(tmp_path):
+    """Income:* transactions count regardless of account type (even NULL)."""
     from simledge.analysis import income_by_category
 
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Test Bank")
-    # Account with type=None (unknown)
     upsert_account(conn, "acct-x", "org-1", "Mystery Account", "USD", None)
-    upsert_transaction(conn, "t-x1", "acct-x", "2026-03-01", 1000.00, "DEPOSIT")
+    upsert_transaction(
+        conn, "t-x1", "acct-x", "2026-03-01", 1000.00, "DEPOSIT", category="Income:Other"
+    )
     result = income_by_category(conn, "2026-03")
     assert len(result) == 1
     assert result[0]["total"] == 1000.00
@@ -521,66 +526,33 @@ def test_spending_excludes_cc_payment_transfers(tmp_path):
     conn.close()
 
 
-def test_income_excludes_internal_transfers(tmp_path):
-    """Internal transfers (self→self) should NOT count as income."""
-    from simledge.analysis import income_by_category, income_trend, monthly_summary
+def test_income_whitelist_ignores_transfers(tmp_path):
+    """Transfers (any kind) don't count as income unless categorized as Income:*."""
+    from simledge.analysis import monthly_summary
 
     conn = init_db(str(tmp_path / "test.db"))
     upsert_institution(conn, "org-1", "Chase", "chase.com")
     upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
     upsert_account(conn, "acct-2", "org-1", "Savings", "USD", "savings")
 
-    # Real income
     upsert_transaction(
         conn, "t1", "acct-1", "2026-03-01", 4225.00, "PAYROLL", category="Income:Salary"
     )
-    # Internal transfer — should NOT be income
+    # Internal transfer — not Income:*, not income
+    upsert_transaction(conn, "t2", "acct-2", "2026-03-05", 1000.00, "TRANSFER", category="Transfer")
+    # CC payment — not Income:*, not income
     upsert_transaction(
         conn,
-        "t2",
+        "t3",
         "acct-2",
         "2026-03-05",
-        1000.00,
-        "TRANSFER FROM CHECKING",
-        category="Transfer:Internal",
+        500.00,
+        "PAYMENT THANK YOU",
+        category="Transfer:Credit Card Payment",
     )
 
     summary = monthly_summary(conn, "2026-03")
     assert summary["total_income"] == 4225.00
-
-    inc = income_by_category(conn, "2026-03")
-    total_inc = sum(c["total"] for c in inc)
-    assert total_inc == 4225.00
-
-    trend = income_trend(conn, months=1)
-    mar = [r for r in trend if r["month"] == "2026-03"]
-    assert mar[0]["total"] == 4225.00
-    conn.close()
-
-
-def test_income_includes_external_transfers(tmp_path):
-    """External transfers (Zelle/Venmo from friends) SHOULD count as income."""
-    from simledge.analysis import income_by_category, monthly_summary
-
-    conn = init_db(str(tmp_path / "test.db"))
-    upsert_institution(conn, "org-1", "Chase", "chase.com")
-    upsert_account(conn, "acct-1", "org-1", "Checking", "USD", "checking")
-
-    # Zelle from a friend — categorized as generic Transfer, not Internal
-    upsert_transaction(
-        conn, "t1", "acct-1", "2026-03-01", 50.00, "ZELLE FROM FRIEND", category="Transfer"
-    )
-    # Real payroll
-    upsert_transaction(
-        conn, "t2", "acct-1", "2026-03-01", 4225.00, "PAYROLL", category="Income:Salary"
-    )
-
-    summary = monthly_summary(conn, "2026-03")
-    assert summary["total_income"] == 4275.00  # payroll + zelle
-
-    inc = income_by_category(conn, "2026-03")
-    total_inc = sum(c["total"] for c in inc)
-    assert total_inc == 4275.00
     conn.close()
 
 
