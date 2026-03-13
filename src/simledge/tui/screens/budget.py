@@ -192,7 +192,7 @@ class BudgetScreen(Screen):
         Binding("n", "new_budget", "New", priority=True),
         Binding("d", "delete_budget", "Delete", priority=True),
         Binding("enter", "edit_budget", "Edit", priority=True),
-        Binding("s", "cycle_sort", "Sort", priority=True),
+        Binding("o", "cycle_sort", "Sort", priority=True),
         Binding("h", "prev_month", "Prev month", show=False),
         Binding("left", "prev_month", "Prev month", show=False),
         Binding("l", "next_month", "Next month", show=False),
@@ -316,7 +316,7 @@ class BudgetScreen(Screen):
         )
         self.query_one("#budget-status", Static).update(
             f"[dim]{budget_count} budgets  |  {status_pace}  |  sort: {sort_label}"
-            f"  |  n: new  d: delete  s: sort  Enter: edit[/]"
+            f"  |  n: new  d: delete  o: sort  Enter: edit[/]"
         )
 
     def _get_selected_category(self):

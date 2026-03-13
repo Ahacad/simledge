@@ -81,6 +81,36 @@ lazygit-inspired dense panels. Do NOT deviate from this style.
 - **Dynamic panels** (e.g. Accounts per-institution) mounted at runtime via `scroll.mount(panel)`.
 - **All styling in `app.tcss`** — screens define structure, TCSS defines appearance.
 
+## TUI Keybindings
+
+Check this before adding new keybindings to avoid conflicts.
+
+### Global (app.py, always active)
+- `1-9, 0` — switch tabs (overview, transactions, accounts, trends, networth, rules, bills, budget, goals, watchlists)
+- `s` — sync
+- `a` — account filter
+- `p` — privacy toggle
+- `?` — help modal
+- `q` — quit
+
+### Shared screen keys (used across multiple screens)
+- `h/left` — prev month
+- `l/right` — next month
+- `t` — go to today
+- `n` — new item
+- `d` — delete item
+- `enter` — edit/open item
+- `escape` — cancel/close modal
+
+### Screen-specific
+- **Transactions**: `f` filters, `g` tag filter
+- **Accounts**: `e` rename, `t` type
+- **Rules**: `r` apply, `R` force apply, `F` force all, `t` dry run, `i` init defaults
+- **Budget**: `o` cycle sort
+- **Recurring**: `v` toggle view
+- **Trends/Net Worth**: `+/-` adjust range
+- **Goals**: `j/k, up/down` select prev/next
+
 ## Releasing
 
 Use `./scripts/release.sh <patch|minor|major>`. It bumps the version in `pyproject.toml`, commits, and creates a git tag. Then push with `git push origin master --tags` — the GitHub Action builds and publishes the release.
