@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Middle, Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import DataTable, Input, Static
+from textual.widgets import DataTable, Input, Select, Static
 
 from simledge.budget import (
     budget_vs_actual,
@@ -14,10 +14,24 @@ from simledge.budget import (
     set_budget,
     total_budget_summary,
 )
-from simledge.config import BUDGETS_PATH, DB_PATH
+from simledge.categorize import load_rules
+from simledge.config import BUDGETS_PATH, DB_PATH, RULES_PATH
 from simledge.db import init_db
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
+
+_CUSTOM = "__custom__"
+
+
+def _get_all_categories(conn):
+    """Get sorted list of all known categories from DB + rules."""
+    db_cats = conn.execute(
+        "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL"
+    ).fetchall()
+    all_cats = {r[0] for r in db_cats}
+    for rule in load_rules(RULES_PATH):
+        all_cats.add(rule["category"])
+    return sorted(all_cats)
 
 
 class BudgetModal(ModalScreen):
@@ -33,13 +47,33 @@ class BudgetModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         title = "Edit Budget" if self._budget else "New Budget"
+        is_edit = bool(self._budget)
+
+        conn = init_db(DB_PATH)
+        categories = _get_all_categories(conn)
+        conn.close()
+
+        options = [(c, c) for c in categories]
+        options.append(("Custom...", _CUSTOM))
+
+        init_value = Select.NULL
+        if is_edit:
+            cat = self._budget["category"]
+            init_value = cat if cat in categories else _CUSTOM
+
         with Middle(), Center(), Vertical(id="budget-modal-box"):
             yield Static(f"[bold]{title}[/]", id="budget-modal-title")
+            yield Select(
+                options,
+                value=init_value,
+                prompt="Category...",
+                id="budget-category-select",
+                disabled=is_edit,
+            )
             yield Input(
-                placeholder="Category",
-                value=self._budget["category"] if self._budget else "",
-                id="budget-category",
-                disabled=bool(self._budget),
+                placeholder="Type custom category...",
+                value=self._budget["category"] if is_edit and init_value == _CUSTOM else "",
+                id="budget-category-custom",
             )
             yield Input(
                 placeholder="Monthly limit",
@@ -47,19 +81,45 @@ class BudgetModal(ModalScreen):
                 id="budget-amount",
             )
             yield Static(
-                "[dim]Category: max 100 chars  |  Amount: positive number\n"
-                "Enter: save  Esc: cancel[/]",
+                "[dim]Amount: positive number\nEnter: save  Esc: cancel[/]",
                 id="budget-modal-hint",
             )
 
     def on_mount(self):
+        custom_input = self.query_one("#budget-category-custom", Input)
+        select = self.query_one("#budget-category-select", Select)
+        if select.value == _CUSTOM:
+            custom_input.display = True
+        else:
+            custom_input.display = False
+
         if self._budget:
             self.query_one("#budget-amount", Input).focus()
         else:
-            self.query_one("#budget-category", Input).focus()
+            select.focus()
+
+    def on_select_changed(self, event: Select.Changed):
+        if event.select.id == "budget-category-select":
+            custom_input = self.query_one("#budget-category-custom", Input)
+            if event.value == _CUSTOM:
+                custom_input.display = True
+                custom_input.focus()
+            else:
+                custom_input.display = False
+
+    def _get_category(self):
+        select = self.query_one("#budget-category-select", Select)
+        if select.value == _CUSTOM:
+            return self.query_one("#budget-category-custom", Input).value.strip()
+        if select.value == Select.NULL:
+            return ""
+        return str(select.value)
 
     def on_input_submitted(self, event: Input.Submitted):
-        category = self.query_one("#budget-category", Input).value.strip()
+        self._submit()
+
+    def _submit(self):
+        category = self._get_category()
         amount_str = self.query_one("#budget-amount", Input).value.strip()
 
         if not category:
