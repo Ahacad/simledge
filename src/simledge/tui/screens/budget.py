@@ -328,52 +328,51 @@ class BudgetScreen(Screen):
 
         # Goal feasibility panel
         goals_panel = self.query_one("#budget-goals-panel")
+        goals_panel.border_title = "Goal Feasibility"
         income = month_summary["total_income"]
         total_spending = abs(month_summary["total_spending"])
         surplus = income - total_spending
 
-        if income > 0:
-            goals_panel.border_title = "Goal Feasibility"
-            goals_panel.display = True
-            surplus_color = "#22c55e" if surplus >= 0 else "#ef4444"
-            glines = [
-                f"[bold]Income:[/] [#22c55e]{format_dollar(income, masked=m)}[/]"
-                f"    [bold]All spending:[/] [#ef4444]{format_dollar(total_spending, masked=m)}[/]"
-                f"    [bold]Surplus:[/] [{surplus_color}]{format_dollar(surplus, signed=True, masked=m)}[/]",
-            ]
+        surplus_color = "#22c55e" if surplus >= 0 else "#ef4444"
+        income_str = (
+            f"[#22c55e]{format_dollar(income, masked=m)}[/]" if income > 0 else "[dim]$0.00[/]"
+        )
+        glines = [
+            f"[bold]Income:[/] {income_str}"
+            f"    [bold]All spending:[/] [#ef4444]{format_dollar(total_spending, masked=m)}[/]"
+            f"    [bold]Surplus:[/] [{surplus_color}]{format_dollar(surplus, signed=True, masked=m)}[/]",
+        ]
 
-            active_goals = [g for g in goals if g["remaining"] > 0]
-            if active_goals and surplus > 0:
-                glines.append("")
-                for g in active_goals:
-                    months_at_surplus = g["remaining"] / surplus
-                    if g["monthly_needed"] is not None:
-                        icon = (
-                            "[#22c55e]\u2713[/]"
-                            if surplus >= g["monthly_needed"]
-                            else "[#eab308]\u25b3[/]"
-                        )
-                        glines.append(
-                            f"  {icon} [bold]{g['name']}[/]: "
-                            f"need {format_dollar(g['monthly_needed'], masked=m)}/mo"
-                            f" \u2014 {months_at_surplus:.0f}mo at current surplus"
-                        )
-                    else:
-                        glines.append(
-                            f"  [dim]\u2014[/] [bold]{g['name']}[/]: "
-                            f"{format_dollar(g['remaining'], masked=m)} remaining"
-                            f" \u2014 {months_at_surplus:.0f}mo at current surplus"
-                        )
-            elif active_goals and surplus <= 0:
-                glines.append("\n  [#ef4444]No surplus available for goals[/]")
-            elif not goals:
-                glines.append("\n  [dim]No goals set (press 9 to create)[/]")
-            else:
-                glines.append("\n  [#22c55e]All goals reached![/]")
-
-            self.query_one("#budget-goals-content", Static).update("\n".join(glines))
+        active_goals = [g for g in goals if g["remaining"] > 0]
+        if active_goals and surplus > 0:
+            glines.append("")
+            for g in active_goals:
+                months_at_surplus = g["remaining"] / surplus
+                if g["monthly_needed"] is not None:
+                    icon = (
+                        "[#22c55e]\u2713[/]"
+                        if surplus >= g["monthly_needed"]
+                        else "[#eab308]\u25b3[/]"
+                    )
+                    glines.append(
+                        f"  {icon} [bold]{g['name']}[/]: "
+                        f"need {format_dollar(g['monthly_needed'], masked=m)}/mo"
+                        f" \u2014 {months_at_surplus:.0f}mo at current surplus"
+                    )
+                else:
+                    glines.append(
+                        f"  [dim]\u2014[/] [bold]{g['name']}[/]: "
+                        f"{format_dollar(g['remaining'], masked=m)} remaining"
+                        f" \u2014 {months_at_surplus:.0f}mo at current surplus"
+                    )
+        elif active_goals and surplus <= 0:
+            glines.append("\n  [#ef4444]No surplus available for goals[/]")
+        elif not goals:
+            glines.append("\n  [dim]No goals set (press 9 to create)[/]")
         else:
-            goals_panel.display = False
+            glines.append("\n  [#22c55e]All goals reached![/]")
+
+        self.query_one("#budget-goals-content", Static).update("\n".join(glines))
 
     def _get_selected_category(self):
         table = self.query_one("#budget-table", DataTable)

@@ -278,7 +278,7 @@ class OverviewScreen(Screen):
         cashflow_panel = self.query_one("#cashflow-panel")
         income = summary["total_income"]
         total_spending = abs(summary["total_spending"])
-        if income > 0 and budget_summary:
+        if budget_summary:
             cashflow_panel.border_title = "Cash Flow"
             cashflow_panel.display = True
             budgeted_spending = budget_summary["total_actual"]
