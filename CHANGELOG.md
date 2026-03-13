@@ -2,6 +2,21 @@
 
 ### Bug Fixes
 
+- Change sort key from s to o, add keybinding reference to CLAUDE.md ([9c994d2](https://github.com/Ahacad/simledge/commit/9c994d21de370d92270d06e741702eb1a43de62b))
+- Persist account_id on goal edit ([2e235b3](https://github.com/Ahacad/simledge/commit/2e235b30eaf69aee3c384edc39acc2e3ace81fc8))
+- Wrap panels in VerticalScroll so goals panel is visible ([adacce5](https://github.com/Ahacad/simledge/commit/adacce5df2969e158425ace1c6a65254bd61a15c))
+- Always show goal feasibility and cashflow panels ([a66626f](https://github.com/Ahacad/simledge/commit/a66626f8c4722a2d5ec4817e199660c1cd8d8f0a))
+
+### Features
+
+- Replace free-text category input with Select dropdown ([3af0455](https://github.com/Ahacad/simledge/commit/3af0455c130541a602e13bea3c45c1c65a064218))
+- Add parent category support with subcategory aggregation ([58e23ad](https://github.com/Ahacad/simledge/commit/58e23adbbd64e46e254453d28b59a2f234a9e7c7))
+- Add sort cycling with s key, default budget high-to-low ([0044e42](https://github.com/Ahacad/simledge/commit/0044e42dd1ea2c079af01d1e993300670a25aab6))
+- Replace free-text account input with Select dropdown ([4135900](https://github.com/Ahacad/simledge/commit/4135900d3f0a2e8f6b01cc98e1fe8df4670827c5))
+- Add cash flow waterfall and goal feasibility panels ([93d9863](https://github.com/Ahacad/simledge/commit/93d9863d8820e07f52259b598efd246a2e5780d4))
+
+### Bug Fixes
+
 - Remove unused init_child variable in transaction detail ([983e402](https://github.com/Ahacad/simledge/commit/983e402bcc6087fee84dee6e11e0e8260dc2ab08))
 
 ### Features
