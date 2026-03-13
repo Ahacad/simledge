@@ -12,7 +12,7 @@ log = setup_logging("simledge.categorize")
 DEFAULT_RULES = [
     # Groceries (top-level)
     {
-        "pattern": "SAFEWAY|TRADER JOE|WHOLE FOODS|QFC|KROGER|ALDI|COSTCO|WALMART.*GROCERY|FRED MEYER|WINCO|PUBLIX|H.E.B|WEGMANS|SPROUTS",
+        "pattern": "SAFEWAY|TRADER JOE|WHOLE FOODS|QFC|KROGER|ALDI|COSTCO|WALMART.*GROCERY|FRED MEYER|WINCO|PUBLIX|H-?E-?B\\b|WEGMANS|SPROUTS",
         "category": "Groceries",
         "priority": 0,
     },
@@ -29,7 +29,7 @@ DEFAULT_RULES = [
     },
     # Housing
     {
-        "pattern": "BILT|RENT|LEASE.*PAY",
+        "pattern": "\\bBILT\\b|\\bRENT\\b|LEASE.*PAY",
         "category": "Housing:Rent",
         "priority": 0,
     },
@@ -44,13 +44,13 @@ DEFAULT_RULES = [
         "priority": 0,
     },
     {
-        "pattern": "PSE|PUGET SOUND|PG.E|DUKE ENERGY|CON.?ED|NATIONAL GRID|SEATTLE CITY LIGHT",
+        "pattern": "\\bPSE\\b|PUGET SOUND|PG&E|PG\\&E|DUKE ENERGY|CON\\s*ED|NATIONAL GRID|SEATTLE CITY LIGHT",
         "category": "Housing:Utilities",
         "priority": 0,
     },
     # Transport
     {
-        "pattern": "SHELL|CHEVRON|ARCO|76|EXXON|MOBIL|BP|SUNOCO|CIRCLE K.*FUEL|COSTCO.*GAS",
+        "pattern": "\\bSHELL\\b|CHEVRON|\\bARCO\\b|\\b76\\b|EXXON|\\bMOBIL\\b|\\bBP\\b|SUNOCO|CIRCLE K.*FUEL|COSTCO.*GAS",
         "category": "Transport:Gas",
         "priority": 0,
     },
@@ -61,7 +61,7 @@ DEFAULT_RULES = [
         "priority": 0,
     },
     {
-        "pattern": "SP.*PARKING|PARKMO|METER|IMPARK|LAZ PARKING",
+        "pattern": "SP\\+.*PARKING|PARKMO|PARK.*METER|IMPARK|LAZ PARKING",
         "category": "Transport:Parking",
         "priority": 0,
     },
@@ -74,7 +74,7 @@ DEFAULT_RULES = [
         "priority": 0,
     },
     {
-        "pattern": "NORDSTROM|UNIQLO|H.M|ZARA|GAP|OLD NAVY|NIKE|REI|PATAGONIA",
+        "pattern": "NORDSTROM|UNIQLO|H&M|H\\s*&\\s*M|ZARA|\\bGAP\\b|OLD NAVY|\\bNIKE\\b|\\bREI\\b|PATAGONIA",
         "category": "Shopping:Clothing",
         "priority": 0,
     },
@@ -137,7 +137,7 @@ DEFAULT_RULES = [
         "category": "Income:Salary",
         "priority": 0,
     },
-    {"pattern": "REFUND|RETURN|CREDIT ADJ", "category": "Income:Refund", "priority": 0},
+    {"pattern": "REFUND|\\bRETURN\\b|CREDIT ADJ", "category": "Income:Refund", "priority": 0},
     # Transfer — credit card payments
     {
         "pattern": "AUTOPAY|AUTO\\s*PAY|PAYMENT\\s*-?\\s*THANK\\s*YOU|BILL\\s+PAY",
