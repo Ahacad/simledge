@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -166,7 +166,15 @@ async def run_sync(full=False, start_date=None, quiet=False):
 
     conn = init_db(DB_PATH)
     if not start_date:
-        start_date = None if full else get_last_sync(conn)
+        last_sync = None if full else get_last_sync(conn)
+        if last_sync:
+            # Look back 14 days from last sync to catch retroactively-posted
+            # transactions (credit cards can take days to post). Duplicates
+            # are harmless thanks to upsert.
+            dt = datetime.fromisoformat(last_sync).replace(tzinfo=UTC)
+            start_date = (dt - timedelta(days=14)).strftime("%Y-%m-%d")
+        else:
+            start_date = None
 
     log.info("syncing from SimpleFIN (start_date=%s, full=%s)", start_date, full)
     data = None

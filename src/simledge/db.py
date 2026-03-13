@@ -170,8 +170,7 @@ def upsert_transaction(
         "INSERT INTO transactions (id, account_id, posted, amount, description,"
         " category, pending, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         " ON CONFLICT(id) DO UPDATE SET description=excluded.description,"
-        " amount=excluded.amount, category=excluded.category,"
-        " pending=excluded.pending, raw_json=excluded.raw_json",
+        " amount=excluded.amount, pending=excluded.pending, raw_json=excluded.raw_json",
         (id, account_id, posted, amount, description, category, int(pending), raw_json),
     )
     conn.commit()
