@@ -222,6 +222,7 @@ class GoalsScreen(Screen):
                 name=result["name"],
                 target_amount=result["target_amount"],
                 target_date=result.get("target_date"),
+                account_id=result.get("account_id"),
             )
             self.app.notify(f"Goal updated: {result['name']}")
         else:

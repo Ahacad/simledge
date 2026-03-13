@@ -6,6 +6,8 @@ from simledge.log import setup_logging
 
 log = setup_logging("simledge.goals")
 
+_SENTINEL = object()
+
 
 def create_goal(conn, name, target_amount, target_date=None, account_id=None):
     starting_balance = 0
@@ -44,7 +46,9 @@ def get_goals(conn):
     ]
 
 
-def update_goal(conn, goal_id, name=None, target_amount=None, target_date=None):
+def update_goal(
+    conn, goal_id, name=None, target_amount=None, target_date=None, account_id=_SENTINEL
+):
     updates, params = [], []
     if name is not None:
         updates.append("name = ?")
@@ -55,6 +59,9 @@ def update_goal(conn, goal_id, name=None, target_amount=None, target_date=None):
     if target_date is not None:
         updates.append("target_date = ?")
         params.append(target_date)
+    if account_id is not _SENTINEL:
+        updates.append("account_id = ?")
+        params.append(account_id)
     if not updates:
         return
     params.append(goal_id)
