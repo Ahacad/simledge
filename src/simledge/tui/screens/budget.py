@@ -174,11 +174,25 @@ def _progress_bar(pct, width=20):
     return f"{bar} {pct:>5.1f}%{warn}"
 
 
+_SORT_MODES = [
+    ("Budget \u2193", lambda r: r["budget"], True),
+    ("Budget \u2191", lambda r: r["budget"], False),
+    ("Spent \u2193", lambda r: r["actual"], True),
+    ("Spent \u2191", lambda r: r["actual"], False),
+    ("Remaining \u2191", lambda r: r["remaining"], False),
+    ("Remaining \u2193", lambda r: r["remaining"], True),
+    ("% Used \u2193", lambda r: r["pct_used"], True),
+    ("% Used \u2191", lambda r: r["pct_used"], False),
+    ("Category A-Z", lambda r: r["category"].lower(), False),
+]
+
+
 class BudgetScreen(Screen):
     BINDINGS = [
         Binding("n", "new_budget", "New", priority=True),
         Binding("d", "delete_budget", "Delete", priority=True),
         Binding("enter", "edit_budget", "Edit", priority=True),
+        Binding("s", "cycle_sort", "Sort", priority=True),
         Binding("h", "prev_month", "Prev month", show=False),
         Binding("left", "prev_month", "Prev month", show=False),
         Binding("l", "next_month", "Next month", show=False),
@@ -196,6 +210,7 @@ class BudgetScreen(Screen):
 
     def on_mount(self):
         self._month = datetime.now().strftime("%Y-%m")
+        self._sort_idx = 0  # default: Budget ↓
         self.query_one("#budget-summary-panel").border_title = "Budget Summary"
         self.query_one("#budget-panel").border_title = "Category Budgets"
         self._refresh_data()
@@ -233,6 +248,12 @@ class BudgetScreen(Screen):
         self._month = datetime.now().strftime("%Y-%m")
         self._refresh_data()
 
+    def action_cycle_sort(self):
+        self._sort_idx = (self._sort_idx + 1) % len(_SORT_MODES)
+        label = _SORT_MODES[self._sort_idx][0]
+        self.app.notify(f"Sort: {label}")
+        self._refresh_data()
+
     def _refresh_data(self):
         m = self.app.privacy_mode
         conn = init_db(DB_PATH)
@@ -243,6 +264,10 @@ class BudgetScreen(Screen):
         items = budget_vs_actual(conn, month, path=BUDGETS_PATH, account_ids=account_ids)
         summary = total_budget_summary(conn, month, path=BUDGETS_PATH, account_ids=account_ids)
         conn.close()
+
+        # Apply current sort mode
+        _, key_func, reverse = _SORT_MODES[self._sort_idx]
+        items.sort(key=key_func, reverse=reverse)
 
         # Summary panel
         self.query_one(
@@ -283,13 +308,15 @@ class BudgetScreen(Screen):
             )
 
         budget_count = len(items)
+        sort_label = _SORT_MODES[self._sort_idx][0]
         status_pace = (
             f"{format_dollar(summary['daily_pace'], masked=m)}/day remaining"
             if summary["days_remaining"] > 0
             else "month ended"
         )
         self.query_one("#budget-status", Static).update(
-            f"[dim]{budget_count} budgets  |  {status_pace}  |  n: new  d: delete  Enter: edit[/]"
+            f"[dim]{budget_count} budgets  |  {status_pace}  |  sort: {sort_label}"
+            f"  |  n: new  d: delete  s: sort  Enter: edit[/]"
         )
 
     def _get_selected_category(self):
@@ -319,6 +346,8 @@ class BudgetScreen(Screen):
             conn, self._month, path=BUDGETS_PATH, account_ids=self.app.active_account_ids
         )
         conn.close()
+        _, key_func, reverse = _SORT_MODES[self._sort_idx]
+        items.sort(key=key_func, reverse=reverse)
         row_idx = table.cursor_coordinate.row
         if row_idx < len(items):
             item = items[row_idx]
