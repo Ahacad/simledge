@@ -4,7 +4,7 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Center, Middle, Vertical
+from textual.containers import Center, Middle, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import DataTable, Input, Select, Static
 
@@ -206,11 +206,12 @@ class BudgetScreen(Screen):
         yield NavBar("budget")
         with Vertical(id="budget-summary-panel", classes="panel"):
             yield Static("", id="budget-summary-content")
-        with Vertical(id="budget-panel", classes="panel"):
-            yield DataTable(id="budget-table")
-            yield Static("", id="budget-status")
-        with Vertical(id="budget-goals-panel", classes="panel"):
-            yield Static("", id="budget-goals-content")
+        with VerticalScroll():
+            with Vertical(id="budget-panel", classes="panel"):
+                yield DataTable(id="budget-table")
+                yield Static("", id="budget-status")
+            with Vertical(id="budget-goals-panel", classes="panel"):
+                yield Static("", id="budget-goals-content")
 
     def on_mount(self):
         self._month = datetime.now().strftime("%Y-%m")

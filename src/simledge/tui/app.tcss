@@ -349,17 +349,22 @@ TagFilterModal {
 
 /* Budget screen */
 #budget-panel {
-    height: 1fr;
+    height: auto;
 }
 
 #budget-table {
-    height: 1fr;
+    height: auto;
+    max-height: 30;
 }
 
 #budget-status {
     height: 1;
     padding: 0 1;
     color: $text-muted;
+}
+
+#budget-goals-panel {
+    height: auto;
 }
 
 /* Budget modal */
