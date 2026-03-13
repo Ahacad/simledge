@@ -56,6 +56,7 @@ class OverviewScreen(Screen):
                 id="budget-overview-panel",
                 classes="panel",
             )
+            yield Vertical(Static("", id="cashflow-content"), id="cashflow-panel", classes="panel")
             yield Vertical(Static("", id="yoy-content"), id="yoy-panel", classes="panel")
             yield Vertical(
                 Static("", id="goals-overview-content"), id="goals-overview-panel", classes="panel"
@@ -272,6 +273,59 @@ class OverviewScreen(Screen):
             self.query_one("#budget-overview-content", Static).update("\n".join(blines))
         else:
             budget_panel.display = False
+
+        # Cash flow waterfall
+        cashflow_panel = self.query_one("#cashflow-panel")
+        income = summary["total_income"]
+        total_spending = abs(summary["total_spending"])
+        if income > 0 and budget_summary:
+            cashflow_panel.border_title = "Cash Flow"
+            cashflow_panel.display = True
+            budgeted_spending = budget_summary["total_actual"]
+            unbudgeted_spending = budget_summary["unbudgeted_spending"]
+            surplus = income - total_spending
+
+            # Waterfall bars
+            max_val = max(income, total_spending, 1)
+            bw = 30
+            bar_char = "\u2588"
+
+            def _bar(val, color):
+                filled = int(bw * min(abs(val), max_val) / max_val)
+                return f"[{color}]{bar_char * filled}[/]"
+
+            surplus_color = "#22c55e" if surplus >= 0 else "#ef4444"
+            clines = [
+                f"  Income            {_bar(income, '#22c55e')}  {format_dollar(income, masked=m)}",
+                f"  Budgeted spend    {_bar(budgeted_spending, '#ef4444')}  {format_dollar(budgeted_spending, masked=m)}",
+                f"  Unbudgeted spend  {_bar(unbudgeted_spending, '#eab308')}  {format_dollar(unbudgeted_spending, masked=m)}",
+                f"  [bold]Surplus           {_bar(abs(surplus), surplus_color)}  [{surplus_color}]{format_dollar(surplus, signed=True, masked=m)}[/][/]",
+            ]
+
+            # Goal feasibility
+            if goals_progress:
+                clines.append("")
+                if surplus > 0:
+                    for g in goals_progress:
+                        if g["monthly_needed"] is not None and g["remaining"] > 0:
+                            months = g["remaining"] / surplus if surplus > 0 else float("inf")
+                            icon = (
+                                "[#22c55e]\u2713[/]"
+                                if surplus >= g["monthly_needed"]
+                                else "[#ef4444]\u2717[/]"
+                            )
+                            clines.append(
+                                f"  {icon} {g['name']}: need {format_dollar(g['monthly_needed'], masked=m)}/mo"
+                                f" \u2014 {months:.0f}mo at current surplus"
+                            )
+                        elif g["remaining"] == 0:
+                            clines.append(f"  [#22c55e]\u2713[/] {g['name']}: [#22c55e]reached![/]")
+                else:
+                    clines.append("  [#ef4444]Deficit — no surplus for goals[/]")
+
+            self.query_one("#cashflow-content", Static).update("\n".join(clines))
+        else:
+            cashflow_panel.display = False
 
         # Year-over-Year panel
         yoy_panel = self.query_one("#yoy-panel")
