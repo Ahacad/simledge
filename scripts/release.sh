@@ -27,14 +27,12 @@ echo "Bumping $current → $next"
 
 sed -i "0,/^version = \"${current}\"/s//version = \"${next}\"/" "$file"
 
-git add "$file"
+echo "Generating CHANGELOG.md..."
+git-cliff --unreleased --tag "v${next}" --prepend CHANGELOG.md
+
+git add "$file" CHANGELOG.md
 git commit -m "chore(release): bump version to ${next}"
 git tag "v${next}"
-
-echo "Generating CHANGELOG.md..."
-git-cliff --output CHANGELOG.md
-git add CHANGELOG.md
-git commit -m "docs(release): update changelog for ${next}"
 
 echo ""
 echo "Done. Push with:"
