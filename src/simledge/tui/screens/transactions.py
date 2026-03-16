@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Middle, Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Checkbox, DataTable, Input, Static
+from textual.widgets import Checkbox, DataTable, Input, Select, Static
 
 from simledge.config import DB_PATH
 from simledge.db import get_transaction, init_db
@@ -22,9 +22,10 @@ class FilterModal(ModalScreen):
         Binding("c", "clear_all", "Clear all", priority=True),
     ]
 
-    def __init__(self, current_filters=None):
+    def __init__(self, current_filters=None, categories=None):
         super().__init__()
         self._current = current_filters or {}
+        self._categories = categories or []
 
     def compose(self) -> ComposeResult:
         f = self._current
@@ -37,10 +38,14 @@ class FilterModal(ModalScreen):
                 id="filter-description",
             )
             yield Static("[dim]Category[/]", classes="field-label")
-            yield Input(
+            cat_options = [("All categories", "")]
+            cat_options.extend(self._categories)
+            yield Select(
+                cat_options,
                 value=f.get("category", ""),
-                placeholder="Filter by category...",
+                prompt="Category...",
                 id="filter-category",
+                allow_blank=False,
             )
             yield Static("[dim]Tag[/]", classes="field-label")
             yield Input(
@@ -78,7 +83,8 @@ class FilterModal(ModalScreen):
         desc = self.query_one("#filter-description", Input).value.strip()
         if desc:
             filters["description"] = desc
-        cat = self.query_one("#filter-category", Input).value.strip()
+        cat_select = self.query_one("#filter-category", Select)
+        cat = str(cat_select.value) if cat_select.value not in (Select.BLANK, "") else ""
         if cat:
             filters["category"] = cat
         tag = self.query_one("#filter-tag", Input).value.strip()
@@ -140,6 +146,7 @@ class TransactionsScreen(Screen):
         Binding("l", "next_month", "Next month", show=False),
         Binding("right", "next_month", "Next month", show=False),
         Binding("t", "goto_today", "Today", show=False),
+        Binding("O", "reset_sort", "Reset sort", show=False),
     ]
 
     def compose(self) -> ComposeResult:
@@ -152,6 +159,14 @@ class TransactionsScreen(Screen):
     def on_mount(self):
         self._month = datetime.now().strftime("%Y-%m")
         self._filters = {}
+        self._sort_column = "Date"
+        self._sort_asc = False  # default: newest first
+        self._sort_col_map = {
+            "Date": "t.posted",
+            "Amount": "t.amount",
+            "Category": "t.category",
+            "Account": "a.display_name",
+        }
         self._update_title()
         self._load_transactions()
         self.query_one("#txn-table", DataTable).focus()
@@ -254,7 +269,9 @@ class TransactionsScreen(Screen):
             )
             params.append(f["tag"].strip().lower())
 
-        query += " ORDER BY t.posted DESC, t.id DESC LIMIT 500"
+        order_col = self._sort_col_map.get(self._sort_column, "t.posted")
+        order_dir = "ASC" if self._sort_asc else "DESC"
+        query += f" ORDER BY {order_col} {order_dir}, t.id DESC LIMIT 500"
 
         rows = conn.execute(query, params).fetchall()
         total = conn.execute(
@@ -265,7 +282,13 @@ class TransactionsScreen(Screen):
 
         table = self.query_one("#txn-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Date", "Description", "Category", "Amount", "Account")
+        table.add_columns(
+            self._col_header("Date"),
+            "Description",
+            self._col_header("Category"),
+            self._col_header("Amount"),
+            self._col_header("Account"),
+        )
 
         m = self.app.privacy_mode
         for r in rows:
@@ -301,6 +324,28 @@ class TransactionsScreen(Screen):
         status += "[/]"
         self.query_one("#txn-status", Static).update(status)
 
+    def _col_header(self, name):
+        if name == self._sort_column:
+            arrow = " \u25b2" if self._sort_asc else " \u25bc"
+            return f"{name}{arrow}"
+        return name
+
+    def on_data_table_header_selected(self, event: DataTable.HeaderSelected):
+        label = str(event.label).replace(" \u25b2", "").replace(" \u25bc", "")
+        if label not in self._sort_col_map:
+            return  # Description not sortable
+        if label == self._sort_column:
+            self._sort_asc = not self._sort_asc
+        else:
+            self._sort_column = label
+            self._sort_asc = label != "Date"  # Date defaults desc, others asc
+        self._reload()
+
+    def action_reset_sort(self):
+        self._sort_column = "Date"
+        self._sort_asc = False
+        self._reload()
+
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "search-input":
             search = event.value.strip()
@@ -325,7 +370,46 @@ class TransactionsScreen(Screen):
             self._load_transactions()
 
     def action_open_filters(self):
-        self.app.push_screen(FilterModal(self._filters), self._on_filter_dismiss)
+        conn = init_db(DB_PATH)
+        rows = conn.execute(
+            "SELECT DISTINCT category FROM transactions"
+            " WHERE category IS NOT NULL ORDER BY category"
+        ).fetchall()
+        conn.close()
+        categories = self._build_category_options([r[0] for r in rows])
+        self.app.push_screen(
+            FilterModal(self._filters, categories=categories),
+            self._on_filter_dismiss,
+        )
+
+    def _build_category_options(self, raw_categories):
+        """Build category list with parent/child grouping as (label, value) tuples."""
+        parents = {}
+        standalone = []
+        for cat in raw_categories:
+            if ":" in cat:
+                parent = cat.split(":")[0]
+                parents.setdefault(parent, []).append(cat)
+            else:
+                standalone.append(cat)
+
+        result = []
+        seen_parents = set()
+        for cat in standalone:
+            result.append((cat, cat))
+            seen_parents.add(cat)
+            if cat in parents:
+                for child in parents[cat]:
+                    result.append((f"  {child}", child))
+
+        # Parents that weren't standalone categories
+        for parent, children in sorted(parents.items()):
+            if parent not in seen_parents:
+                result.append((parent, parent))
+                for child in children:
+                    result.append((f"  {child}", child))
+
+        return result
 
     def _on_filter_dismiss(self, result):
         if result is None:
