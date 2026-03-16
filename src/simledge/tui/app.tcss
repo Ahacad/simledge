@@ -84,6 +84,12 @@ NavBar {
     border: round #2dd4bf;
 }
 
+/* Category drill-down tables */
+#category-table, #category-spending-table {
+    height: auto;
+    max-height: 20;
+}
+
 /* Chart panels */
 #nw-chart, #cf-chart, #spending-chart, #income-chart {
     height: auto;

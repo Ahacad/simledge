@@ -47,7 +47,11 @@ class OverviewScreen(Screen):
                 id="spending-trend-panel",
                 classes="panel",
             )
-            yield Vertical(Static("", id="category-content"), id="category-panel", classes="panel")
+            yield Vertical(
+                DataTable(id="category-table", cursor_type="row"),
+                id="category-panel",
+                classes="panel",
+            )
             yield Vertical(
                 Static("", id="merchants-content"), id="merchants-panel", classes="panel"
             )
@@ -165,7 +169,10 @@ class OverviewScreen(Screen):
             summary_lines += f"    [bold][#eab308]{uncat_count} uncategorized[/][/]"
         self.query_one("#summary-content", Static).update(summary_lines)
 
-        # Category bars (hierarchical)
+        # Category bars (hierarchical) — DataTable
+        cat_table = self.query_one("#category-table", DataTable)
+        cat_table.clear(columns=True)
+        cat_table.add_columns("Category", "Amount", "Bar", "%")
         if categories:
             total_spend = sum(abs(c["total"]) for c in categories)
             max_pct = max(
@@ -175,32 +182,35 @@ class OverviewScreen(Screen):
             bar_char = "\u2588"
             empty_char = "\u2591"
 
-            lines = []
             for c in categories:
                 cat = c["category"]
                 amt = abs(c["total"])
                 pct = (amt / total_spend * 100) if total_spend else 0
                 filled = int(bar_width * (pct / max_pct)) if max_pct > 0 else 0
                 bar = f"[#2dd4bf]{bar_char * filled}[/][#333]{empty_char * (bar_width - filled)}[/]"
-                cat_padded = f"{cat:<18}"
-                lines.append(
-                    f"[#2dd4bf]{cat_padded}[/] [bold]{format_dollar(amt, masked=m):>10}[/]  {bar}  [dim]{pct:>5.1f}%[/]"
+                cat_table.add_row(
+                    f"[#2dd4bf]{cat}[/]",
+                    f"[bold]{format_dollar(amt, masked=m):>10}[/]",
+                    bar,
+                    f"[dim]{pct:>5.1f}%[/]",
+                    key=cat,
                 )
                 for child in c.get("children", []):
                     child_name = child["category"].split(":", 1)[1]
+                    child_cat = child["category"]
                     child_amt = abs(child["total"])
                     child_pct = (child_amt / total_spend * 100) if total_spend else 0
                     child_filled = int(bar_width * (child_pct / max_pct)) if max_pct > 0 else 0
                     child_bar = f"[#1a9985]{bar_char * child_filled}[/][#333]{empty_char * (bar_width - child_filled)}[/]"
-                    child_padded = f"{child_name:<16}"
-                    lines.append(
-                        f"  [#5eead4]{child_padded}[/] [bold]{format_dollar(child_amt, masked=m):>10}[/]  {child_bar}  [dim]{child_pct:>5.1f}%[/]"
+                    cat_table.add_row(
+                        f"  [#5eead4]{child_name}[/]",
+                        f"[bold]{format_dollar(child_amt, masked=m):>10}[/]",
+                        child_bar,
+                        f"[dim]{child_pct:>5.1f}%[/]",
+                        key=child_cat,
                     )
-            self.query_one("#category-content", Static).update("\n".join(lines))
         else:
-            self.query_one("#category-content", Static).update(
-                "[dim]No spending data this month[/]"
-            )
+            cat_table.add_row("[dim]No spending data this month[/]", "", "", "")
 
         # Spending trend (last 6 months mini bar chart)
         trend_panel = self.query_one("#spending-trend-panel")
@@ -458,3 +468,10 @@ class OverviewScreen(Screen):
         self.query_one("#sync-status", Static).update(
             f"[dim]Last sync: {last_sync or 'never'}  \u2502  {txn_count} transactions[/]"
         )
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        if event.data_table.id == "category-table":
+            category = str(event.row_key.value)
+            if category and not category.startswith("[dim]"):
+                self.app.txn_initial_filter = {"category": category}
+                self.app.switch_mode("transactions")
