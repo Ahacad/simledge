@@ -1,5 +1,7 @@
 # SimpLedge — Personal Finance TUI
 
+**Check `TODO.md` for pending work items. Update it (mark done / remove) when a task is completed.**
+
 ## What This Is
 
 Personal finance data tool. Syncs bank/card/investment data via SimpleFIN, stores locally in SQLite, provides structured analysis through a Textual TUI dashboard.
