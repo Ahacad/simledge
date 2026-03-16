@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import DataTable, Static
 
 from simledge.analysis import (
     income_by_category,
@@ -46,7 +46,8 @@ class TrendsScreen(Screen):
                 Static("", id="yoy-category-content"), id="yoy-category-panel", classes="panel"
             )
             with Vertical(id="category-spending-panel", classes="panel"):
-                yield Static("", id="category-spending-content")
+                yield Static("", id="category-spending-stacked-bar")
+                yield DataTable(id="category-spending-table", cursor_type="row")
 
     def on_mount(self):
         self._lookback = 6
@@ -214,6 +215,9 @@ class TrendsScreen(Screen):
         cat_panel = self.query_one("#category-spending-panel")
         cat_panel.border_title = f"Spending by Category — {current_month[5:]}"
 
+        cat_table = self.query_one("#category-spending-table", DataTable)
+        cat_table.clear(columns=True)
+        cat_table.add_columns("Category", "Amount", "Bar", "%")
         if current_cats:
             total_spending = sum(abs(c["total"]) for c in current_cats)
             max_cat = max(abs(c["total"]) for c in current_cats) if current_cats else 1
@@ -224,7 +228,9 @@ class TrendsScreen(Screen):
                 (g["category"], abs(g["total"]), get_category_color(g["category"]))
                 for g in current_cats
             ]
-            cat_lines = [render_stacked_bar(stacked_segments), ""]
+            self.query_one("#category-spending-stacked-bar", Static).update(
+                render_stacked_bar(stacked_segments)
+            )
 
             for group in current_cats:
                 cat = group["category"]
@@ -232,32 +238,48 @@ class TrendsScreen(Screen):
                 pct = (amt / total_spending * 100) if total_spending else 0
                 filled = int(bar_width * (amt / max_cat)) if max_cat > 0 else 0
                 bar = f"[#2dd4bf]{chr(0x2588) * filled}[/][#333]{chr(0x2591) * (bar_width - filled)}[/]"
-                cat_lines.append(
-                    f"[bold]{cat:<18}[/] {format_dollar(amt, masked=m):>10}  {bar}  [dim]{pct:>5.1f}%[/]"
+                cat_table.add_row(
+                    f"[bold]{cat}[/]",
+                    f"{format_dollar(amt, masked=m):>10}",
+                    bar,
+                    f"[dim]{pct:>5.1f}%[/]",
+                    key=cat,
                 )
 
-                # Subcategories
-                children = group.get("children", [])
-                for child in children:
+                for child in group.get("children", []):
                     sub_name = (
                         child["category"].split(":", 1)[1]
                         if ":" in child["category"]
                         else child["category"]
                     )
+                    child_cat = child["category"]
                     sub_amt = abs(child["total"])
                     sub_pct = (sub_amt / total_spending * 100) if total_spending else 0
                     sub_filled = int(bar_width * (sub_amt / max_cat)) if max_cat > 0 else 0
                     sub_bar = f"[#1a9a8a]{chr(0x2588) * sub_filled}[/][#333]{chr(0x2591) * (bar_width - sub_filled)}[/]"
-                    cat_lines.append(
-                        f"  [dim]{sub_name:<16}[/] {format_dollar(sub_amt, masked=m):>10}  {sub_bar}  [dim]{sub_pct:>5.1f}%[/]"
+                    cat_table.add_row(
+                        f"  [dim]{sub_name}[/]",
+                        f"{format_dollar(sub_amt, masked=m):>10}",
+                        sub_bar,
+                        f"[dim]{sub_pct:>5.1f}%[/]",
+                        key=child_cat,
                     )
 
-            # Total line
-            cat_lines.append(
-                f"\n[bold]{'Total':<18}[/] {format_dollar(total_spending, masked=m):>10}"
+            # Total row
+            cat_table.add_row(
+                "[bold]Total[/]",
+                f"[bold]{format_dollar(total_spending, masked=m):>10}[/]",
+                "",
+                "",
+                key="__total__",
             )
-            self.query_one("#category-spending-content", Static).update("\n".join(cat_lines))
         else:
-            self.query_one("#category-spending-content", Static).update(
-                "[dim]No spending data this month[/]"
-            )
+            cat_table.add_row("[dim]No spending data this month[/]", "", "", "")
+            self.query_one("#category-spending-stacked-bar", Static).update("")
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        if event.data_table.id == "category-spending-table":
+            category = str(event.row_key.value)
+            if category and category != "__total__" and not category.startswith("[dim]"):
+                self.app.txn_initial_filter = {"category": category}
+                self.app.switch_mode("transactions")

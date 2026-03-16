@@ -154,11 +154,23 @@ class TransactionsScreen(Screen):
         self._month = datetime.now().strftime("%Y-%m")
         self._filters = {}
         self._update_title()
+        self._apply_initial_filter()
         self._load_transactions()
         self.query_one("#txn-table", DataTable).focus()
 
     def on_screen_resume(self):
+        initial = getattr(self.app, "txn_initial_filter", None)
+        if initial:
+            self.app.txn_initial_filter = None
+            self._filters.update(initial)
+            self._reload()
         self.query_one("#txn-table", DataTable).focus()
+
+    def _apply_initial_filter(self):
+        initial = getattr(self.app, "txn_initial_filter", None)
+        if initial:
+            self.app.txn_initial_filter = None
+            self._filters.update(initial)
 
     def _update_title(self):
         month_display = datetime.strptime(self._month, "%Y-%m").strftime("%B %Y")
