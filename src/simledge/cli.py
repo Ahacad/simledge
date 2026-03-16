@@ -24,6 +24,19 @@ def main():
     export_p = sub.add_parser("export", help="export data for analysis")
     export_p.add_argument("--month", help="YYYY-MM (default: current month)")
     export_p.add_argument("--format", choices=["markdown", "csv", "json"], default="markdown")
+    export_p.add_argument(
+        "--full", action="store_true", help="comprehensive JSON export for AI consumption"
+    )
+    export_p.add_argument(
+        "--months", type=int, default=6, help="trend depth in months (default: 6)"
+    )
+    export_p.add_argument(
+        "--section", nargs="+", help="sections to include (omit for all)", metavar="SECTION"
+    )
+    export_p.add_argument("--account", nargs="+", help="filter by account ID", metavar="ID")
+    export_p.add_argument(
+        "--limit", type=int, default=500, help="max transactions to include (default: 500)"
+    )
 
     rule_p = sub.add_parser("rule", help="manage category rules")
     rule_sub = rule_p.add_subparsers(dest="rule_command")
@@ -157,12 +170,24 @@ def _run_export(args):
     from datetime import datetime
 
     from simledge.db import init_db
-    from simledge.export import export_csv, export_json, export_markdown
+    from simledge.export import export_csv, export_json, export_json_full, export_markdown
 
     month = args.month or datetime.now().strftime("%Y-%m")
     conn = init_db(DB_PATH)
 
-    if args.format == "markdown":
+    if args.full or args.section:
+        account_ids = set(args.account) if args.account else None
+        print(
+            export_json_full(
+                conn,
+                month,
+                months=args.months,
+                sections=args.section,
+                account_ids=account_ids,
+                limit=args.limit,
+            )
+        )
+    elif args.format == "markdown":
         print(export_markdown(conn, month))
     elif args.format == "csv":
         print(export_csv(conn, month))
