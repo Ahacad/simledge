@@ -242,8 +242,8 @@ SECTIONS = {
 ALL_SECTIONS = list(SECTIONS.keys())
 
 
-def export_json_full(conn, month, months=6, sections=None, account_ids=None, limit=500):
-    """Comprehensive JSON export for AI consumption."""
+def _build_full_data(conn, month, months=6, sections=None, account_ids=None, limit=500):
+    """Gather comprehensive data for all requested sections."""
     if sections is None:
         sections = ALL_SECTIONS
 
@@ -267,4 +267,242 @@ def export_json_full(conn, month, months=6, sections=None, account_ids=None, lim
         except Exception as e:
             result[section] = {"error": str(e)}
 
-    return json.dumps(result, indent=2, default=str)
+    return result
+
+
+def export_json_full(conn, month, months=6, sections=None, account_ids=None, limit=500):
+    """Comprehensive JSON export for AI consumption."""
+    data = _build_full_data(conn, month, months, sections, account_ids, limit)
+    return json.dumps(data, indent=2, default=str)
+
+
+def export_csv_full(conn, month, months=6, sections=None, account_ids=None, limit=500):
+    """Comprehensive CSV export — transactions with all metadata."""
+    txns = _get_transactions(conn, month, account_ids=account_ids, limit=limit)
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output, fieldnames=["date", "description", "category", "amount", "account"]
+    )
+    writer.writeheader()
+    writer.writerows(txns)
+    return output.getvalue()
+
+
+def _md_table(headers, rows):
+    """Render a markdown table from headers and row tuples."""
+    lines = ["| " + " | ".join(headers) + " |"]
+    lines.append("| " + " | ".join("---" for _ in headers) + " |")
+    for row in rows:
+        lines.append("| " + " | ".join(str(c) for c in row) + " |")
+    return lines
+
+
+def export_markdown_full(conn, month, months=6, sections=None, account_ids=None, limit=500):
+    """Comprehensive markdown export."""
+    data = _build_full_data(conn, month, months, sections, account_ids, limit)
+    active = data["meta"]["sections"]
+    lines = [f"# SimpLedge Export — {month}", ""]
+
+    if "summary" in active and "summary" in data:
+        s = data["summary"]
+        lines.append("## Summary")
+        lines.append(f"- Total spending: ${abs(s['total_spending']):,.2f}")
+        lines.append(f"- Total income: ${s['total_income']:,.2f}")
+        lines.append(f"- Net: ${s['net']:+,.2f}")
+        lines.append(f"- Daily average spending: ${s['daily_average_spending']:,.2f}")
+        lines.append(f"- Uncategorized transactions: {s['uncategorized_count']}")
+        lines.append("")
+
+    if "spending" in active and "spending" in data:
+        sp = data["spending"]
+        if sp.get("by_category"):
+            total_spend = sum(c["total"] for c in sp["by_category"])
+            lines.append("## Spending by Category")
+            rows = []
+            for c in sp["by_category"]:
+                pct = (c["total"] / total_spend * 100) if total_spend else 0
+                rows.append((c["category"], f"${abs(c['total']):,.2f}", f"{pct:.1f}%"))
+            lines.extend(_md_table(["Category", "Amount", "% of Total"], rows))
+            lines.append("")
+
+        if sp.get("by_tag"):
+            lines.append("## Spending by Tag")
+            rows = [(t["tag"], f"${abs(t['total']):,.2f}") for t in sp["by_tag"]]
+            lines.extend(_md_table(["Tag", "Amount"], rows))
+            lines.append("")
+
+        if sp.get("top_merchants"):
+            lines.append("## Top Merchants")
+            rows = [
+                (m["merchant"], f"${abs(m['total']):,.2f}", str(m["count"]))
+                for m in sp["top_merchants"]
+            ]
+            lines.extend(_md_table(["Merchant", "Amount", "Transactions"], rows))
+            lines.append("")
+
+    if "income" in active and "income" in data:
+        inc = data["income"].get("by_category", [])
+        if inc:
+            lines.append("## Income by Category")
+            rows = [(i["category"], f"${i['total']:,.2f}") for i in inc]
+            lines.extend(_md_table(["Category", "Amount"], rows))
+            lines.append("")
+
+    if "accounts" in active and "accounts" in data:
+        accts = data["accounts"]
+        if accts:
+            lines.append("## Accounts")
+            rows = []
+            for a in accts:
+                name = a.get("display_name") or a["name"]
+                bal = f"${a['balance']:,.2f}" if a["balance"] is not None else "N/A"
+                rows.append((a.get("institution", ""), name, a.get("type", ""), bal))
+            lines.extend(_md_table(["Institution", "Account", "Type", "Balance"], rows))
+            lines.append("")
+
+    if "trends" in active and "trends" in data:
+        tr = data["trends"]
+        if tr.get("spending"):
+            lines.append("## Spending Trend")
+            rows = [(t["month"], f"${abs(t['total']):,.2f}") for t in tr["spending"]]
+            lines.extend(_md_table(["Month", "Spending"], rows))
+            lines.append("")
+
+        if tr.get("income"):
+            lines.append("## Income Trend")
+            rows = [(t["month"], f"${t['total']:,.2f}") for t in tr["income"]]
+            lines.extend(_md_table(["Month", "Income"], rows))
+            lines.append("")
+
+        if tr.get("net_worth"):
+            lines.append("## Net Worth History")
+            rows = [(t["month"], f"${t['net_worth']:,.2f}") for t in tr["net_worth"]]
+            lines.extend(_md_table(["Month", "Net Worth"], rows))
+            lines.append("")
+
+    if "comparisons" in active and "comparisons" in data:
+        cmp = data["comparisons"]
+        if cmp.get("yoy"):
+            y = cmp["yoy"]
+            lines.append("## Year-over-Year Comparison")
+            lines.append(f"- Current ({y['current_month']}): ${abs(y['current_spending']):,.2f}")
+            lines.append(f"- Previous ({y['previous_month']}): ${abs(y['previous_spending']):,.2f}")
+            if y.get("spending_change_pct") is not None:
+                lines.append(f"- Change: {y['spending_change_pct']:+.1f}%")
+            lines.append("")
+
+        if cmp.get("ytd"):
+            yt = cmp["ytd"]
+            lines.append("## Year-to-Date")
+            lines.append(
+                f"- {yt['current_year']} spending ({yt['months_counted']}mo): "
+                f"${abs(yt['current_spending']):,.2f}"
+            )
+            lines.append(f"- Previous year same period: ${abs(yt['previous_spending']):,.2f}")
+            if yt.get("spending_change_pct") is not None:
+                lines.append(f"- Change: {yt['spending_change_pct']:+.1f}%")
+            lines.append("")
+
+    if "budget" in active and "budget" in data:
+        bd = data["budget"]
+        if bd.get("items"):
+            lines.append("## Budget vs Actual")
+            rows = [
+                (
+                    b["category"],
+                    f"${b['budget']:,.2f}",
+                    f"${b['actual']:,.2f}",
+                    f"${b['remaining']:,.2f}",
+                    f"{b['pct_used']:.0f}%",
+                )
+                for b in bd["items"]
+            ]
+            lines.extend(_md_table(["Category", "Budget", "Actual", "Remaining", "Used"], rows))
+            lines.append("")
+
+    if "goals" in active and "goals" in data:
+        goals = [g for g in data["goals"] if g]
+        if goals:
+            lines.append("## Goals")
+            rows = [
+                (
+                    g["name"],
+                    f"${g['target_amount']:,.2f}",
+                    f"${g['current_amount']:,.2f}",
+                    f"{g['pct_complete']:.0f}%",
+                )
+                for g in goals
+            ]
+            lines.extend(_md_table(["Goal", "Target", "Current", "Progress"], rows))
+            lines.append("")
+
+    if "watchlists" in active and "watchlists" in data:
+        wl = [w for w in data["watchlists"] if w]
+        if wl:
+            lines.append("## Watchlists")
+            rows = [
+                (
+                    w["name"],
+                    f"${w['monthly_target']:,.2f}" if w.get("monthly_target") else "N/A",
+                    f"${w['actual']:,.2f}",
+                    "On track" if w.get("on_track") else "Over",
+                )
+                for w in wl
+            ]
+            lines.extend(_md_table(["Watchlist", "Target", "Actual", "Status"], rows))
+            lines.append("")
+
+    if "recurring" in active and "recurring" in data:
+        rec = data["recurring"]
+        if rec.get("detected"):
+            lines.append("## Recurring Transactions")
+            rows = [
+                (
+                    r["description"],
+                    r["frequency"],
+                    f"${abs(r['last_amount']):,.2f}",
+                    r["next_expected"],
+                )
+                for r in rec["detected"]
+            ]
+            lines.extend(_md_table(["Description", "Frequency", "Amount", "Next Expected"], rows))
+            lines.append("")
+
+    if "cashflow" in active and "cashflow" in data:
+        cf = data["cashflow"]
+        if cf.get("summary"):
+            s = cf["summary"]
+            lines.append("## Cash Flow Projection")
+            lines.append(f"- Current total: ${s['current_total']:,.2f}")
+            lines.append(f"- 30-day: ${s['projected_30d']:,.2f}")
+            lines.append(f"- 60-day: ${s['projected_60d']:,.2f}")
+            lines.append(f"- 90-day: ${s['projected_90d']:,.2f}")
+            if cf.get("negative_dates"):
+                lines.append(f"- Warning: {len(cf['negative_dates'])} account(s) go negative")
+            lines.append("")
+
+    if "networth" in active and "networth" in data:
+        nw = data["networth"]
+        lines.append("## Net Worth")
+        lines.append(f"- Current: ${nw['current']:,.2f}")
+        lines.append("")
+
+    if "transactions" in active and "transactions" in data:
+        txn_data = data["transactions"]
+        items = txn_data.get("items", [])
+        if items:
+            lines.append("## Transactions")
+            if txn_data.get("truncated"):
+                lines.append(
+                    f"*Showing {txn_data['returned_count']} of "
+                    f"{txn_data['total_count']} transactions*"
+                )
+                lines.append("")
+            rows = [
+                (t["date"], t["description"], t["category"], f"${t['amount']:+,.2f}", t["account"])
+                for t in items
+            ]
+            lines.extend(_md_table(["Date", "Description", "Category", "Amount", "Account"], rows))
+            lines.append("")
+
+    return "\n".join(lines)

@@ -230,3 +230,44 @@ def test_get_transactions_no_limit(tmp_path):
     txns = _get_transactions(conn, "2026-03")
     assert len(txns) == 16  # all transactions
     conn.close()
+
+
+def test_export_markdown_full_all_sections(tmp_path):
+    from simledge.export import export_markdown_full
+
+    conn = _seed(tmp_path)
+    output = export_markdown_full(conn, "2026-03")
+
+    # Has comprehensive sections
+    assert "# SimpLedge Export" in output
+    assert "## Summary" in output
+    assert "Daily average spending" in output
+    assert "Uncategorized" in output
+    assert "## Spending by Category" in output
+    assert "## Transactions" in output
+    assert "WHOLE FOODS" in output
+    conn.close()
+
+
+def test_export_markdown_full_single_section(tmp_path):
+    from simledge.export import export_markdown_full
+
+    conn = _seed(tmp_path)
+    output = export_markdown_full(conn, "2026-03", sections=["summary"])
+
+    assert "## Summary" in output
+    # No transactions section
+    assert "## Transactions" not in output
+    assert "## Spending by Category" not in output
+    conn.close()
+
+
+def test_export_csv_full(tmp_path):
+    from simledge.export import export_csv_full
+
+    conn = _seed_multi_account(tmp_path)
+    output = export_csv_full(conn, "2026-03", limit=5)
+    lines = output.strip().split("\n")
+    assert "date" in lines[0].lower()
+    assert len(lines) == 6  # header + 5 rows
+    conn.close()
