@@ -2,6 +2,23 @@
 
 ### Bug Fixes
 
+- 14-day lookback on incremental sync and preserve user categories ([dc62d9b](https://github.com/Ahacad/simledge/commit/dc62d9bed9bfe502c58e2731608fe4d611937d30))
+- Tighten overly broad regex patterns in default rules ([3f63a1a](https://github.com/Ahacad/simledge/commit/3f63a1a28258cb98d20e09ae0ee6aab1ee873efb))
+- Exclude transfers from income calculations ([ae5f90f](https://github.com/Ahacad/simledge/commit/ae5f90fab3eb167dd3ab0136308d3f79f9de6637))
+- Detect internal transfers and exclude only self-to-self from income ([d2ba0c0](https://github.com/Ahacad/simledge/commit/d2ba0c0f355a5016557f76530010f7c386cb4470))
+- Whitelist income as category-based instead of heuristic ([e12ef94](https://github.com/Ahacad/simledge/commit/e12ef941062a27fe0abaa518284c610b1be9928e))
+- --full respects --format flag, add comprehensive markdown/csv ([f545f36](https://github.com/Ahacad/simledge/commit/f545f36f6aec256940678e2627d93debcaed3345))
+
+### Features
+
+- Add comprehensive structured JSON export for AI consumption ([783dd37](https://github.com/Ahacad/simledge/commit/783dd37e7e70207620c6eb0111f3c33fdd2cd80e))
+
+### Refactor
+
+- Remove legacy export, always use comprehensive output ([0c02039](https://github.com/Ahacad/simledge/commit/0c020397ba03e560e8d9dae92bf097c503533a14))
+
+### Bug Fixes
+
 - Change sort key from s to o, add keybinding reference to CLAUDE.md ([9c994d2](https://github.com/Ahacad/simledge/commit/9c994d21de370d92270d06e741702eb1a43de62b))
 - Persist account_id on goal edit ([2e235b3](https://github.com/Ahacad/simledge/commit/2e235b30eaf69aee3c384edc39acc2e3ace81fc8))
 - Wrap panels in VerticalScroll so goals panel is visible ([adacce5](https://github.com/Ahacad/simledge/commit/adacce5df2969e158425ace1c6a65254bd61a15c))
