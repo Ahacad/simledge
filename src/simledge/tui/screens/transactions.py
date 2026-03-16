@@ -8,6 +8,7 @@ from textual.containers import Center, Middle, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Checkbox, DataTable, Input, Static
 
+from simledge.colors import get_category_color
 from simledge.config import DB_PATH
 from simledge.db import get_transaction, init_db
 from simledge.tags import get_transaction_tags
@@ -272,10 +273,11 @@ class TransactionsScreen(Screen):
             txn_id, posted, desc, cat, amount, acct_name, pending = r
             color = "[#22c55e]" if amount > 0 else "[#ef4444]"
             pending_mark = " \u23f3" if pending else ""
+            cat_color = get_category_color(cat)
             table.add_row(
                 posted,
                 (desc or "")[:35],
-                cat,
+                f"[{cat_color}]{cat}[/]",
                 f"{color}{format_dollar(amount, signed=True, masked=m)}[/]{pending_mark}",
                 acct_name,
                 key=txn_id,
