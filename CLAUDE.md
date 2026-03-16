@@ -152,12 +152,29 @@ For non-trivial features, use the team leader + parallel teammates pattern:
 2. **Team leader creates tasks** — break the plan into independent, parallelizable units of work.
 3. **Spawn teammates in worktrees** — each teammate works in an isolated git worktree (`isolation: "worktree"`), so they can't step on each other. Assign one task (or a small group of related tasks) per teammate.
 4. **Teammates work in parallel** — each builds, tests, and commits in their own worktree branch. Follow all project conventions (code style, testing, commit messages).
-5. **Merge and report** — team leader merges each teammate's branch into the main working branch, resolves any conflicts, runs full test suite, and reports results to the human.
+5. **Rebase and integrate** — team leader rebases each teammate's branch onto master, never merge. This keeps the history linear and clean.
+
+### Integrating worktree branches
+
+**Always rebase, never merge.** Merge commits from throwaway worktree branches (`Merge branch 'worktree-agent-aa5c1a7a'`) are noise that pollutes `git log`.
+
+```bash
+# For each completed worktree branch:
+git rebase master worktree-branch    # replay commits onto master
+git checkout master
+git merge --ff-only worktree-branch  # fast-forward, no merge commit
+
+# If multiple worktrees, integrate sequentially:
+# rebase branch-1 onto master, ff-merge, then rebase branch-2 onto updated master, ff-merge, etc.
+```
+
+If a rebase has conflicts, resolve them during the rebase (not via a merge commit). If the worktree branch has messy intermediate commits, squash them during rebase (`git rebase -i` is not available in non-interactive mode, so use `git reset --soft` + re-commit before rebasing).
 
 Key rules:
 - **Worktree isolation is mandatory** for parallel teammates — never have two agents editing the same branch.
 - **Each teammate runs `pytest` before finishing** — don't hand broken code back to the leader.
-- **Team leader owns the merge** — teammates do not push to master or merge themselves.
+- **Team leader owns the integration** — teammates do not push to master or rebase themselves.
+- **Linear history only** — no merge commits from worktree branches. If `git log --oneline` shows `Merge branch 'worktree-agent-*'`, something went wrong.
 - **Keep the human in the loop** — report progress at milestones, surface blockers immediately.
 
 ## Testing
