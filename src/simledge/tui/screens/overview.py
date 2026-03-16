@@ -21,9 +21,11 @@ from simledge.analysis import (
     ytd_comparison,
 )
 from simledge.budget import budget_vs_actual, total_budget_summary
+from simledge.colors import get_category_color
 from simledge.config import BUDGETS_PATH, DB_PATH
 from simledge.db import get_last_sync, init_db
 from simledge.goals import all_goals_progress
+from simledge.tui.charts import render_stacked_bar
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 from simledge.watchlist import all_watchlist_spending, get_watchlists
@@ -175,7 +177,12 @@ class OverviewScreen(Screen):
             bar_char = "\u2588"
             empty_char = "\u2591"
 
-            lines = []
+            # Stacked bar summary
+            stacked_segments = [
+                (c["category"], abs(c["total"]), get_category_color(c["category"]))
+                for c in categories
+            ]
+            lines = [render_stacked_bar(stacked_segments), ""]
             for c in categories:
                 cat = c["category"]
                 amt = abs(c["total"])
@@ -447,10 +454,12 @@ class OverviewScreen(Screen):
         table.add_columns("Date", "Description", "Category", "Amount")
         for t in recent:
             color = "[#22c55e]" if t["amount"] > 0 else "[#ef4444]"
+            cat_text = t["category"] or "\u2014"
+            cat_color = get_category_color(cat_text)
             table.add_row(
                 t["posted"],
                 t["description"][:30],
-                t["category"] or "\u2014",
+                f"[{cat_color}]{cat_text}[/]",
                 f"{color}{format_dollar(t['amount'], signed=True, masked=m)}[/]",
             )
 

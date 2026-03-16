@@ -3,6 +3,8 @@
 import plotext as plt
 from rich.text import Text
 
+from simledge.tui.formatting import format_dollar
+
 TEAL = (45, 212, 191)
 GREEN = (34, 197, 94)
 RED = (239, 68, 68)
@@ -74,6 +76,71 @@ def render_bar_chart(values, labels, width=80, height=12, color=TEAL):
     plt.plotsize(width, height + 2)  # extra height for labels
     canvas = plt.build()
     return Text.from_ansi(canvas)
+
+
+def render_stacked_bar(segments, width=60):
+    """Render a stacked bar chart with legend as Rich markup.
+
+    Args:
+        segments: list of (name, amount, color) tuples.
+        width: character width for the bar.
+
+    Returns:
+        Rich markup string with colored bar and legend rows.
+    """
+    if not segments:
+        return "[dim]No data[/]"
+
+    total = sum(amt for _, amt, _ in segments)
+    if total <= 0:
+        return "[dim]No data[/]"
+
+    # Collapse segments <2% into "Other"
+    MIN_PCT = 2.0
+    major = []
+    other_amt = 0.0
+    other_colors = []
+    for name, amt, color in segments:
+        pct = (amt / total) * 100
+        if pct < MIN_PCT:
+            other_amt += amt
+            other_colors.append(color)
+        else:
+            major.append((name, amt, color))
+
+    if other_amt > 0:
+        # Use the first collapsed color or gray
+        other_color = other_colors[0] if other_colors else "#6b7280"
+        major.append(("Other", other_amt, other_color))
+
+    # Build bar
+    bar_chars = []
+    legend_lines = []
+    remaining_width = width
+    for i, (name, amt, color) in enumerate(major):
+        pct = (amt / total) * 100
+        if i == len(major) - 1:
+            # Last segment gets remaining width to avoid rounding gaps
+            chars = remaining_width
+        else:
+            chars = max(1, round(width * amt / total))
+            remaining_width -= chars
+            # Prevent overshooting
+            if remaining_width < 1 and i < len(major) - 1:
+                remaining_width = 1
+                chars = (
+                    width
+                    - sum(max(1, round(width * major[j][1] / total)) for j in range(i))
+                    - (len(major) - i - 1)
+                )
+                chars = max(1, chars)
+
+        block = "\u2588" * chars
+        bar_chars.append(f"[{color}]{block}[/]")
+        legend_lines.append(f"[{color}]\u25cf[/] {name}  {format_dollar(amt)}  {pct:.1f}%")
+
+    bar_line = "".join(bar_chars)
+    return bar_line + "\n" + "\n".join(legend_lines)
 
 
 def render_data_table(labels, values, width=80):

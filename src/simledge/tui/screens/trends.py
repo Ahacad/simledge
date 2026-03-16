@@ -15,9 +15,10 @@ from simledge.analysis import (
     spending_trend,
     yoy_comparison,
 )
+from simledge.colors import get_category_color
 from simledge.config import DB_PATH
 from simledge.db import init_db
-from simledge.tui.charts import GREEN, TEAL, render_bar_chart, render_data_table
+from simledge.tui.charts import GREEN, TEAL, render_bar_chart, render_data_table, render_stacked_bar
 from simledge.tui.formatting import format_dollar
 from simledge.tui.widgets.navbar import NavBar
 
@@ -217,7 +218,13 @@ class TrendsScreen(Screen):
             total_spending = sum(abs(c["total"]) for c in current_cats)
             max_cat = max(abs(c["total"]) for c in current_cats) if current_cats else 1
             bar_width = 30
-            cat_lines = []
+
+            # Stacked bar summary
+            stacked_segments = [
+                (g["category"], abs(g["total"]), get_category_color(g["category"]))
+                for g in current_cats
+            ]
+            cat_lines = [render_stacked_bar(stacked_segments), ""]
 
             for group in current_cats:
                 cat = group["category"]

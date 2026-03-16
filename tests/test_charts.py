@@ -68,3 +68,55 @@ def test_render_bar_chart_with_labels():
     result = render_bar_chart([100, 200, 150], ["Jan", "Feb", "Mar"])
     assert isinstance(result, Text)
     assert len(result) > 0
+
+
+def test_render_stacked_bar_basic():
+    from simledge.tui.charts import render_stacked_bar
+
+    segments = [
+        ("Food", 500.0, "#fb923c"),
+        ("Housing", 1200.0, "#60a5fa"),
+        ("Transport", 300.0, "#a78bfa"),
+    ]
+    result = render_stacked_bar(segments, width=40)
+    assert "\u2588" in result  # contains bar blocks
+    assert "Food" in result
+    assert "Housing" in result
+    assert "Transport" in result
+    assert "$500.00" in result
+    assert "$1,200.00" in result
+    assert "\u25cf" in result  # legend dots
+
+
+def test_render_stacked_bar_empty():
+    from simledge.tui.charts import render_stacked_bar
+
+    result = render_stacked_bar([])
+    assert "No data" in result
+
+
+def test_render_stacked_bar_single():
+    from simledge.tui.charts import render_stacked_bar
+
+    result = render_stacked_bar([("Groceries", 400.0, "#f59e0b")], width=20)
+    assert "Groceries" in result
+    assert "$400.00" in result
+    assert "100.0%" in result
+
+
+def test_render_stacked_bar_collapse_small():
+    from simledge.tui.charts import render_stacked_bar
+
+    segments = [
+        ("Housing", 1000.0, "#60a5fa"),
+        ("Food", 500.0, "#fb923c"),
+        ("Tiny", 5.0, "#aaaaaa"),  # <2% of total
+        ("Micro", 3.0, "#bbbbbb"),  # <2% of total
+    ]
+    result = render_stacked_bar(segments, width=40)
+    assert "Housing" in result
+    assert "Food" in result
+    assert "Other" in result
+    # The collapsed categories should not appear by name
+    assert "Tiny" not in result
+    assert "Micro" not in result
