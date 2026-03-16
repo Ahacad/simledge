@@ -23,9 +23,11 @@ def main():
 
     export_p = sub.add_parser("export", help="export data for analysis")
     export_p.add_argument("--month", help="YYYY-MM (default: current month)")
-    export_p.add_argument("--format", choices=["markdown", "csv", "json"])
     export_p.add_argument(
-        "--full", action="store_true", help="comprehensive JSON export for AI consumption"
+        "--format",
+        choices=["markdown", "csv", "json"],
+        default="json",
+        help="output format (default: json)",
     )
     export_p.add_argument(
         "--months", type=int, default=6, help="trend depth in months (default: 6)"
@@ -170,46 +172,24 @@ def _run_export(args):
     from datetime import datetime
 
     from simledge.db import init_db
-    from simledge.export import (
-        export_csv,
-        export_csv_full,
-        export_json,
-        export_json_full,
-        export_markdown,
-        export_markdown_full,
-    )
+    from simledge.export import export_csv_full, export_json_full, export_markdown_full
 
     month = args.month or datetime.now().strftime("%Y-%m")
     conn = init_db(DB_PATH)
+    account_ids = set(args.account) if args.account else None
+    kwargs = dict(
+        months=args.months,
+        sections=args.section,
+        account_ids=account_ids,
+        limit=args.limit,
+    )
 
-    fmt = args.format
-    if args.full or args.section:
-        # --full defaults to json, but respects explicit --format
-        if fmt is None:
-            fmt = "json"
-        account_ids = set(args.account) if args.account else None
-        kwargs = dict(
-            months=args.months,
-            sections=args.section,
-            account_ids=account_ids,
-            limit=args.limit,
-        )
-        if fmt == "markdown":
-            print(export_markdown_full(conn, month, **kwargs))
-        elif fmt == "csv":
-            print(export_csv_full(conn, month, **kwargs))
-        else:
-            print(export_json_full(conn, month, **kwargs))
+    if args.format == "markdown":
+        print(export_markdown_full(conn, month, **kwargs))
+    elif args.format == "csv":
+        print(export_csv_full(conn, month, **kwargs))
     else:
-        # Legacy behavior: defaults to markdown
-        if fmt is None:
-            fmt = "markdown"
-        if fmt == "markdown":
-            print(export_markdown(conn, month))
-        elif fmt == "csv":
-            print(export_csv(conn, month))
-        elif fmt == "json":
-            print(export_json(conn, month))
+        print(export_json_full(conn, month, **kwargs))
 
     conn.close()
 
