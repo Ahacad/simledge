@@ -175,7 +175,10 @@ class OverviewScreen(Screen):
         # Category bars (hierarchical) — DataTable
         cat_table = self.query_one("#category-table", DataTable)
         cat_table.clear(columns=True)
-        cat_table.add_columns("Category", "Amount", "Bar", "%")
+        cat_table.add_column("Category", width=20)
+        cat_table.add_column("Amount", width=12)
+        cat_table.add_column("Bar", width=27)
+        cat_table.add_column("%", width=8)
         if categories:
             total_spend = sum(abs(c["total"]) for c in categories)
             max_pct = max(
@@ -485,8 +488,10 @@ class OverviewScreen(Screen):
         )
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected):
-        if event.data_table.id == "category-table":
-            category = str(event.row_key.value)
-            if category and not category.startswith("[dim]"):
-                self.app.txn_initial_filter = {"category": category}
-                self.app.switch_mode("transactions")
+        if event.data_table.id != "category-table":
+            return
+        event.data_table.release_mouse()
+        category = str(event.row_key.value)
+        if category and not category.startswith("[dim]"):
+            self.app.txn_initial_filter = {"category": category}
+            self.call_later(self.app.switch_mode, "transactions")

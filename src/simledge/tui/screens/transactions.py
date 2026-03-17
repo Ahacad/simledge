@@ -1,5 +1,6 @@
 """Transactions screen — searchable, filterable table."""
 
+import time
 from datetime import datetime
 
 from textual.app import ComposeResult
@@ -344,6 +345,14 @@ class TransactionsScreen(Screen):
             return f"{name}{arrow}"
         return name
 
+    def on_click(self, event):
+        now = time.monotonic()
+        if now - getattr(self, "_last_click_time", 0) < 0.35:
+            # Rapid clicks can corrupt DataTable rendering state.
+            # Schedule a rebuild to clear it (same effect as pressing Escape).
+            self.set_timer(0.15, self._reload)
+        self._last_click_time = now
+
     def on_data_table_header_selected(self, event: DataTable.HeaderSelected):
         label = str(event.label).replace(" \u25b2", "").replace(" \u25bc", "")
         if label not in self._sort_col_map:
@@ -448,6 +457,11 @@ class TransactionsScreen(Screen):
         self._reload()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        if getattr(self, "_detail_open", False):
+            return
+        # Release any stuck mouse state from rapid clicks
+        event.data_table.release_mouse()
+
         txn_id = str(event.row_key.value)
         conn = init_db(DB_PATH)
         txn = get_transaction(conn, txn_id)
@@ -456,7 +470,10 @@ class TransactionsScreen(Screen):
         if not txn:
             return
 
+        self._detail_open = True
+
         def on_dismiss(changed):
+            self._detail_open = False
             if changed:
                 self._reload()
 

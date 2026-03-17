@@ -217,7 +217,10 @@ class TrendsScreen(Screen):
 
         cat_table = self.query_one("#category-spending-table", DataTable)
         cat_table.clear(columns=True)
-        cat_table.add_columns("Category", "Amount", "Bar", "%")
+        cat_table.add_column("Category", width=20)
+        cat_table.add_column("Amount", width=12)
+        cat_table.add_column("Bar", width=32)
+        cat_table.add_column("%", width=8)
         if current_cats:
             total_spending = sum(abs(c["total"]) for c in current_cats)
             max_cat = max(abs(c["total"]) for c in current_cats) if current_cats else 1
@@ -278,8 +281,10 @@ class TrendsScreen(Screen):
             self.query_one("#category-spending-stacked-bar", Static).update("")
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected):
-        if event.data_table.id == "category-spending-table":
-            category = str(event.row_key.value)
-            if category and category != "__total__" and not category.startswith("[dim]"):
-                self.app.txn_initial_filter = {"category": category}
-                self.app.switch_mode("transactions")
+        if event.data_table.id != "category-spending-table":
+            return
+        event.data_table.release_mouse()
+        category = str(event.row_key.value)
+        if category and category != "__total__" and not category.startswith("[dim]"):
+            self.app.txn_initial_filter = {"category": category}
+            self.call_later(self.app.switch_mode, "transactions")
